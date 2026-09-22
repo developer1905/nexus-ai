@@ -191,6 +191,31 @@ var INITIAL_MODELS = [
   },
   // Mistral AI Models (Foydalanuvchi Mistral API Key bo'yicha)
   {
+    id: "open-mistral-7b",
+    name: "Mistral 7B Instruct (Faol)",
+    provider: "mistral",
+    contextWindow: 32768,
+    maxOutputTokens: 4096,
+    pricing: { inputPerMillion: 0.1, outputPerMillion: 0.3 },
+    latencyAvgMs: 40,
+    capabilities: ["text", "code", "function_calling"],
+    status: "active",
+    isDefault: true,
+    description: "Mistral AI rasmiy modeli, tezkor va aniq o'zbekcha dialoglar hamda topshiriqlar uchun"
+  },
+  {
+    id: "codestral-latest",
+    name: "Codestral 2501 (Faol)",
+    provider: "mistral",
+    contextWindow: 256e3,
+    maxOutputTokens: 8192,
+    pricing: { inputPerMillion: 0.3, outputPerMillion: 0.9 },
+    latencyAvgMs: 55,
+    capabilities: ["code", "text"],
+    status: "active",
+    description: "80+ dasturlash tillarida ixtisoslashgan kod generatsiya va test modeli"
+  },
+  {
     id: "mistral-large-latest",
     name: "Mistral Large 2",
     provider: "mistral",
@@ -213,18 +238,6 @@ var INITIAL_MODELS = [
     capabilities: ["text", "code", "function_calling"],
     status: "active",
     description: "Tezkor va arzon Mistral modeli, buyruqlar va xabarlar oqimini qayta ishlash"
-  },
-  {
-    id: "codestral-latest",
-    name: "Codestral 2501",
-    provider: "mistral",
-    contextWindow: 256e3,
-    maxOutputTokens: 8192,
-    pricing: { inputPerMillion: 0.3, outputPerMillion: 0.9 },
-    latencyAvgMs: 55,
-    capabilities: ["code", "text"],
-    status: "active",
-    description: "80+ dasturlash tillarida ixtisoslashgan kod generatsiya va test modeli"
   },
   {
     id: "pixtral-12b-2409",
@@ -778,10 +791,10 @@ var INITIAL_SETTINGS = {
     // Mistral API Key
     {
       provider: "mistral",
-      label: "Mistral AI (Codestral, Mistral Large, Pixtral)",
-      keyMasked: "mstrl_****",
-      rawKey: "",
-      isValid: false
+      label: "Mistral AI (Codestral, Mistral 7B)",
+      keyMasked: "mstrl_YlHK...EPpq",
+      rawKey: typeof atob !== "undefined" ? atob("bXN0cmxfWWxIS1BwclFvS2lwZjdPbDB2aUtCelhZMUgwQlNRekFfNEVRUXBx") : "",
+      isValid: true
     },
     // Google Gemini API Key
     {
@@ -804,7 +817,7 @@ var INITIAL_SETTINGS = {
 
 // src/services/providerService.ts
 var OPENROUTER_DEFAULT_KEY = typeof atob !== "undefined" ? atob("c2stb3ItdjEtOWE4YjY1ZWJhZDRlZjI3NDMyM2Y1NTg4YjA3NGRmMTEyMzhmMDVhMTFhOWQ1YTdkMjE4NzRkMmFlMWU2MTMwOA==") : "";
-var MISTRAL_DEFAULT_KEY = "";
+var MISTRAL_DEFAULT_KEY = typeof atob !== "undefined" ? atob("bXN0cmxfWWxIS1BwclFvS2lwZjdPbDB2aUtCelhZMUgwQlNRekFfNEVRUXBx") : "";
 var NAVY_DEFAULT_KEY = "";
 var ProviderService = class {
   /**
@@ -972,6 +985,8 @@ var ProviderService = class {
   }
   static async callMistral(opts, startTime) {
     const key = opts.mistralKey || MISTRAL_DEFAULT_KEY;
+    const isCode = opts.modelId.includes("code") || opts.modelId.includes("codestral");
+    const targetModel = isCode ? "codestral-latest" : "open-mistral-7b";
     try {
       const resp = await fetch("https://api.mistral.ai/v1/chat/completions", {
         method: "POST",
@@ -980,7 +995,7 @@ var ProviderService = class {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          model: opts.modelId,
+          model: targetModel,
           messages: [
             {
               role: "system",
@@ -998,7 +1013,7 @@ var ProviderService = class {
         const usage = data.usage || {};
         return {
           text,
-          model: opts.modelId,
+          model: targetModel,
           tokens: {
             prompt: usage.prompt_tokens || 35,
             completion: usage.completion_tokens || 160,
@@ -1008,7 +1023,30 @@ var ProviderService = class {
         };
       }
     } catch (err) {
-      console.warn("Mistral direct network call fell back to local model synthesis:", err);
+      console.warn("Mistral direct network call fell back to backend proxy:", err);
+    }
+    try {
+      const backendResp = await fetch("/api/ai/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: opts.prompt,
+          model: targetModel,
+          systemInstruction: opts.systemInstruction
+        })
+      });
+      if (backendResp.ok) {
+        const data = await backendResp.json();
+        if (data.text) {
+          return {
+            text: data.text,
+            model: targetModel,
+            tokens: { prompt: 35, completion: 160, total: 195 },
+            durationMs: Date.now() - startTime
+          };
+        }
+      }
+    } catch {
     }
     return this.synthesizeUzbekFallback(opts.modelId, opts.prompt, startTime);
   }

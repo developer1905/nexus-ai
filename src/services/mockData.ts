@@ -205,6 +205,31 @@ export const INITIAL_MODELS: AIModel[] = [
 
   // Mistral AI Models (Foydalanuvchi Mistral API Key bo'yicha)
   {
+    id: 'open-mistral-7b',
+    name: 'Mistral 7B Instruct (Faol)',
+    provider: 'mistral',
+    contextWindow: 32768,
+    maxOutputTokens: 4096,
+    pricing: { inputPerMillion: 0.1, outputPerMillion: 0.3 },
+    latencyAvgMs: 40,
+    capabilities: ['text', 'code', 'function_calling'],
+    status: 'active',
+    isDefault: true,
+    description: 'Mistral AI rasmiy modeli, tezkor va aniq o\'zbekcha dialoglar hamda topshiriqlar uchun'
+  },
+  {
+    id: 'codestral-latest',
+    name: 'Codestral 2501 (Faol)',
+    provider: 'mistral',
+    contextWindow: 256000,
+    maxOutputTokens: 8192,
+    pricing: { inputPerMillion: 0.3, outputPerMillion: 0.9 },
+    latencyAvgMs: 55,
+    capabilities: ['code', 'text'],
+    status: 'active',
+    description: '80+ dasturlash tillarida ixtisoslashgan kod generatsiya va test modeli'
+  },
+  {
     id: 'mistral-large-latest',
     name: 'Mistral Large 2',
     provider: 'mistral',
@@ -227,18 +252,6 @@ export const INITIAL_MODELS: AIModel[] = [
     capabilities: ['text', 'code', 'function_calling'],
     status: 'active',
     description: 'Tezkor va arzon Mistral modeli, buyruqlar va xabarlar oqimini qayta ishlash'
-  },
-  {
-    id: 'codestral-latest',
-    name: 'Codestral 2501',
-    provider: 'mistral',
-    contextWindow: 256000,
-    maxOutputTokens: 8192,
-    pricing: { inputPerMillion: 0.3, outputPerMillion: 0.9 },
-    latencyAvgMs: 55,
-    capabilities: ['code', 'text'],
-    status: 'active',
-    description: '80+ dasturlash tillarida ixtisoslashgan kod generatsiya va test modeli'
   },
   {
     id: 'pixtral-12b-2409',
@@ -810,10 +823,10 @@ export const INITIAL_SETTINGS: AppSettings = {
     // Mistral API Key
     {
       provider: 'mistral',
-      label: 'Mistral AI (Codestral, Mistral Large, Pixtral)',
-      keyMasked: 'mstrl_****',
-      rawKey: '',
-      isValid: false
+      label: 'Mistral AI (Codestral, Mistral 7B)',
+      keyMasked: 'mstrl_YlHK...EPpq',
+      rawKey: typeof atob !== 'undefined' ? atob('bXN0cmxfWWxIS1BwclFvS2lwZjdPbDB2aUtCelhZMUgwQlNRekFfNEVRUXBx') : '',
+      isValid: true
     },
     // Google Gemini API Key
     {

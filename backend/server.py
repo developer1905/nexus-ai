@@ -44,11 +44,14 @@ load_dotenv()
 
 PORT = int(os.environ.get("PORT", 8000))
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent"
-DEFAULT_OR_B64 = "c2stb3ItdjEtOWE4YjY1ZWJhZDRlZjI3NDMyM2Y1NTg4YjA3NGRmMTEyMzhmMDVhMTFhOWQ1YTdkMjE4NzRkMmFlMWU2MTMwOA=="
 import base64
+DEFAULT_OR_B64 = "c2stb3ItdjEtOWE4YjY1ZWJhZDRlZjI3NDMyM2Y1NTg4YjA3NGRmMTEyMzhmMDVhMTFhOWQ1YTdkMjE4NzRkMmFlMWU2MTMwOA=="
 DEFAULT_OPENROUTER_KEY = base64.b64decode(DEFAULT_OR_B64).decode()
 OPENROUTER_KEY = os.environ.get("OPENROUTER_API_KEY", "") or DEFAULT_OPENROUTER_KEY
-MISTRAL_KEY = os.environ.get("MISTRAL_API_KEY", "")
+
+DEFAULT_MISTRAL_B64 = "bXN0cmxfWWxIS1BwclFvS2lwZjdPbDB2aUtCelhZMUgwQlNRekFfNEVRUXBx"
+DEFAULT_MISTRAL_KEY = base64.b64decode(DEFAULT_MISTRAL_B64).decode()
+MISTRAL_KEY = os.environ.get("MISTRAL_API_KEY", "") or DEFAULT_MISTRAL_KEY
 NAVY_KEY = os.environ.get("NAVY_API_KEY", "")
 TELEGRAM_JARVIS_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8993321594:AAFo1UtJ6T4Q1gxGx0v43bQDcJOPb3LmR_Y")
 
@@ -56,6 +59,76 @@ EMERGENCY_STOP_ACTIVE = False
 EMERGENCY_STOP_REASON = ""
 
 WEB_APP_URL = "https://nexus-ai-httf.onrender.com"
+
+def call_mistral_api(prompt, system_prompt, model_name="open-mistral-7b", api_key=None):
+    key = api_key or MISTRAL_KEY
+    if not key:
+        return None
+    url = "https://api.mistral.ai/v1/chat/completions"
+    body = {
+        "model": model_name,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.2,
+        "max_tokens": 1500
+    }
+    try:
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(body).encode('utf-8'),
+            headers={
+                "Authorization": f"Bearer {key}",
+                "Content-Type": "application/json"
+            }
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+            ans = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+            return ans.strip() if ans else None
+    except Exception as e:
+        print(f"Mistral API error ({model_name}): {e}", file=sys.stderr)
+        return None
+
+def call_openrouter_api(prompt, system_prompt, model_candidates=None, api_key=None):
+    key = api_key or OPENROUTER_KEY or DEFAULT_OPENROUTER_KEY
+    if not key:
+        return None
+    if not model_candidates:
+        model_candidates = ["nex-agi/nex-n2.5-pro:free", "nex-agi/nex-n2.5-mini:free", "liquid/lfm-2.5-2.6b:free"]
+
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    for cand in model_candidates:
+        try:
+            body = {
+                "model": cand,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.3,
+                "max_tokens": 1500
+            }
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(body).encode('utf-8'),
+                headers={
+                    "Authorization": f"Bearer {key}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://nexus-ai-httf.onrender.com",
+                    "X-Title": "Nexus AI Enterprise"
+                }
+            )
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+                ans = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                if ans and len(ans.strip()) > 0:
+                    return ans.strip()
+        except Exception as e:
+            print(f"OpenRouter candidate {cand} error: {e}", file=sys.stderr)
+            continue
+    return None
 
 # Foydalanuvchi sozlamalari (chat_id -> {model: "nova", custom_key: ""})
 USER_PREFERENCES = {}
@@ -93,12 +166,13 @@ def get_models_keyboard(current_model="nova"):
     models = [
         ("hermes", "🪽 Hermes (Xabarchi)"),
         ("nova", "🎯 Nova PM (Loyiha)"),
-        ("kite", "💻 Kite Developer (Kod)"),
+        ("kite", "💻 Kite (Dasturchi)"),
         ("atlas", "🔬 Atlas (Tadqiqot)"),
         ("lyra", "✍️ Lyra (SMM & Matn)"),
         ("cipher", "📊 Cipher (Tahlilchi)"),
         ("deepseek", "🧠 DeepSeek V3"),
-        ("mistral", "🌪️ Mistral Large"),
+        ("mistral", "🌪️ Mistral 7B"),
+        ("codestral", "💻 Codestral 2501"),
         ("gemini", "⚡ Gemini Flash")
     ]
     rows = []
@@ -424,19 +498,18 @@ class NexusAPIHandler(http.server.SimpleHTTPRequestHandler):
             return "⚠️ Favqulodda to'xtatish rejimi (Emergency Stop) faol. AI generatsiya vaqtincha to'xtatilgan."
 
         user_key = USER_PREFERENCES.get(chat_id, {}).get("custom_key") if chat_id else None
-        effective_or_key = user_key or OPENROUTER_KEY or DEFAULT_OPENROUTER_KEY
-        effective_mistral_key = user_key or MISTRAL_KEY
         prompt_clean = prompt.strip()
 
         # Har bir mutaxassis agent va model uchun haqiqiy tizimli ko'rsatma (System Persona)
         personas = {
             "hermes": "Siz Hermes — Nexus AI ning tezkor dispatcher va integratsiya agentsiz. Har doim o'zbek tilida juda tezkor, lo'nda, aniq va amaliy javob bering. Kanallar, xabarlar marshrutlash va API aloqalari bo'yicha yordam bering.",
             "kite": "Siz Kite Developer — professional dasturchisiz. Foydalanuvchining har qanday texnik yoki kod yozish so'roviga to'liq, sifatli, xatosiz ishlaydigan kod (Python, JavaScript, SQL, HTML/CSS va h.k.) yozib, o'zbek tilida tushuntiring.",
+            "codestral": "Siz Codestral — Mistral AI ning professional dasturchi modelisiz. Toza, optimallashtirilgan kod yozing va o'zbekcha tushuntiring.",
             "atlas": "Siz Atlas Researcher — chuqur ilmiy va bozor tahlilchisisiz. Har qanday mavzuda batafsil, faktlarga asoslangan, tuzilgan va tahliliy o'zbekcha javob bering.",
             "lyra": "Siz Lyra Copywriter — mohir o'zbekcha kontent muallifisiz. Telegram kanallari va biznes uchun jozibali, imlo jihatdan mukammal, e'tibor tortuvchi postlar, reklama va maqolalar yozing.",
             "cipher": "Siz Cipher Analyst — moliya va ma'lumotlar tahlilchisisiz. Hisob-kitoblar, statistika, jadvallar va KPI ko'rsatkichlari bo'yicha aniq raqamli xulosalar taqdim eting.",
             "nova": "Siz Nova PM — bosh boshqaruvchi va loyiha menejerisiz. Vazifalarni rejalashtirish, bosqichlarga ajratish va topshiriqlarni boshqarish bo'yicha tizimli harakatlar rejasini bering.",
-            "deepseek": "Siz kuchli mantiqiy fikrlovchi sun'iy intellektsiz. Har qanday murakkab savolga qadamma-qadam, to'liq va mukammal o'zbek tilida javob bering.",
+            "deepseek": "Siz DeepSeek mantiqiy fikrlovchi sun'iy intellektsiz. Har qanday murakkab savolga qadamma-qadam, to'liq va mukammal o'zbek tilida javob bering.",
             "mistral": "Siz Mistral AI asosidagi yuqori aniqlikdagi aqlli yordamchisiz. O'zbek tilida aniq va professional javob bering.",
             "gemini": "Siz Gemini AI modelisiz. Har qanday savolga keng qamrovli, tezkor va aniq o'zbek tilida javob bering."
         }
@@ -447,52 +520,55 @@ class NexusAPIHandler(http.server.SimpleHTTPRequestHandler):
         icons = {
             "hermes": "🪽 *[Hermes Agent]*",
             "kite": "💻 *[Kite Developer]*",
+            "codestral": "💻 *[Codestral Mistral]*",
             "atlas": "🔬 *[Atlas Researcher]*",
             "lyra": "✍️ *[Lyra Copywriter]*",
             "cipher": "📊 *[Cipher Analyst]*",
             "nova": "🎯 *[Nova PM]*",
             "deepseek": "🧠 *[DeepSeek AI]*",
-            "mistral": "🌪️ *[Mistral AI]*",
+            "mistral": "🌪️ *[Mistral 7B]*",
             "gemini": "⚡ *[Gemini AI]*"
         }
         header_icon = icons.get(model_id, "🤖 *[Nexus AI]*")
 
-        # 1. Haqiqiy OpenRouter LLM modellariga ulanish
-        candidate_models = [
-            "nex-agi/nex-n2.5-pro:free",
-            "nex-agi/nex-n2.5-mini:free",
-            "liquid/lfm-2.5-2.6b:free"
-        ]
+        ans = None
 
-        if effective_or_key:
-            for cand in candidate_models:
-                try:
-                    headers = {
-                        "Authorization": f"Bearer {effective_or_key}",
-                        "Content-Type": "application/json",
-                        "HTTP-Referer": "https://nexus-ai-httf.onrender.com",
-                        "X-Title": "Nexus AI Enterprise"
-                    }
-                    body = {
-                        "model": cand,
-                        "messages": [
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": prompt_clean}
-                        ],
-                        "temperature": 0.3,
-                        "max_tokens": 1500
-                    }
-                    req = urllib.request.Request("https://openrouter.ai/api/v1/chat/completions", data=json.dumps(body).encode('utf-8'), headers=headers)
-                    with urllib.request.urlopen(req, timeout=12) as resp:
-                        data = json.loads(resp.read().decode('utf-8'))
-                        ans = data.get("choices", [{}])[0].get("message", {}).get("content", "")
-                        if ans and len(ans.strip()) > 0:
-                            return f"{header_icon}\n\n{ans.strip()}"
-                except Exception as e:
-                    print(f"OpenRouter candidate {cand} error: {e}", file=sys.stderr)
-                    continue
+        # 1. Mistral modellariga to'g'ridan-to'g'ri marshrutlash (mistral, codestral, kite)
+        if model_id in ["mistral", "codestral"] or "mistral" in model_id.lower():
+            mistral_m = "codestral-latest" if ("code" in model_id.lower() or model_id == "codestral") else "open-mistral-7b"
+            ans = call_mistral_api(prompt_clean, system_prompt, model_name=mistral_m, api_key=user_key)
+            if not ans and mistral_m != "open-mistral-7b":
+                ans = call_mistral_api(prompt_clean, system_prompt, model_name="open-mistral-7b", api_key=user_key)
 
-        # 2. Agar tarmoqda kechikish bo'lsa — zaxira kontekstual javob
+        elif model_id == "kite":
+            ans = call_mistral_api(prompt_clean, system_prompt, model_name="codestral-latest", api_key=user_key)
+
+        # 2. Agar javob olinmagan bo'lsa yoki OpenRouter modellarida (deepseek, gemini, hermes, nova, atlas, lyra, cipher)
+        if not ans:
+            custom_candidates = []
+            if user_key:
+                if model_id == "deepseek":
+                    custom_candidates.append("deepseek/deepseek-chat")
+                elif model_id == "gemini":
+                    custom_candidates.append("google/gemini-2.5-flash")
+                elif "/" in model_id:
+                    custom_candidates.append(model_id)
+
+            candidates = custom_candidates + [
+                "nex-agi/nex-n2.5-pro:free",
+                "nex-agi/nex-n2.5-mini:free",
+                "liquid/lfm-2.5-2.6b:free"
+            ]
+            ans = call_openrouter_api(prompt_clean, system_prompt, model_candidates=candidates, api_key=user_key)
+
+        # 3. Zaxira: agar OpenRouter sekinlashsa, Mistral orqali kafolatlangan javob
+        if not ans:
+            ans = call_mistral_api(prompt_clean, system_prompt, model_name="open-mistral-7b", api_key=user_key)
+
+        if ans and len(ans.strip()) > 0:
+            return f"{header_icon}\n\n{ans.strip()}"
+
+        # 4. Agar tarmoqda kechikish bo'lsa — zaxira kontekstual javob
         prompt_lower = prompt_clean.lower()
         is_greeting = any(
             prompt_lower == g or prompt_lower.startswith(g + " ") or prompt_lower.startswith(g + "!") or prompt_lower.startswith(g + ",")
@@ -532,12 +608,13 @@ class NexusAPIHandler(http.server.SimpleHTTPRequestHandler):
                 model_names = {
                     "hermes": "🪽 Hermes Agent (Xabarchi & Integrator)",
                     "nova": "🎯 Nova PM (Loyiha boshqaruvi)",
-                    "kite": "💻 Kite Developer (Dasturchi)",
+                    "kite": "💻 Kite Developer (Dasturchi - Codestral)",
                     "atlas": "🔬 Atlas Researcher (Tadqiqot)",
                     "lyra": "✍️ Lyra Copywriter (SMM & Kontent)",
                     "cipher": "📊 Cipher Analyst (Tahlilchi)",
-                    "deepseek": "🧠 DeepSeek V3 (OpenRouter)",
-                    "mistral": "🌪️ Mistral Large (Mistral AI)",
+                    "deepseek": "🧠 DeepSeek V3 (Reasoning)",
+                    "mistral": "🌪️ Mistral 7B (Mistral AI)",
+                    "codestral": "💻 Codestral 2501 (Mistral AI)",
                     "gemini": "⚡ Gemini 2.5 Flash"
                 }
                 m_name = model_names.get(chosen_model, chosen_model)

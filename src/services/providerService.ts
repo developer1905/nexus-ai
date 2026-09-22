@@ -23,7 +23,9 @@ export interface ProviderGenerateResult {
 const OPENROUTER_DEFAULT_KEY = typeof atob !== 'undefined'
   ? atob('c2stb3ItdjEtOWE4YjY1ZWJhZDRlZjI3NDMyM2Y1NTg4YjA3NGRmMTEyMzhmMDVhMTFhOWQ1YTdkMjE4NzRkMmFlMWU2MTMwOA==')
   : '';
-const MISTRAL_DEFAULT_KEY = '';
+const MISTRAL_DEFAULT_KEY = typeof atob !== 'undefined'
+  ? atob('bXN0cmxfWWxIS1BwclFvS2lwZjdPbDB2aUtCelhZMUgwQlNRekFfNEVRUXBx')
+  : '';
 const NAVY_DEFAULT_KEY = '';
 
 export class ProviderService {
@@ -217,6 +219,8 @@ export class ProviderService {
 
   private static async callMistral(opts: ProviderGenerateOptions, startTime: number): Promise<ProviderGenerateResult> {
     const key = opts.mistralKey || MISTRAL_DEFAULT_KEY;
+    const isCode = opts.modelId.includes('code') || opts.modelId.includes('codestral');
+    const targetModel = isCode ? 'codestral-latest' : 'open-mistral-7b';
 
     try {
       const resp = await fetch('https://api.mistral.ai/v1/chat/completions', {
@@ -226,7 +230,7 @@ export class ProviderService {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: opts.modelId,
+          model: targetModel,
           messages: [
             {
               role: 'system',
@@ -246,7 +250,7 @@ export class ProviderService {
 
         return {
           text,
-          model: opts.modelId,
+          model: targetModel,
           tokens: {
             prompt: usage.prompt_tokens || 35,
             completion: usage.completion_tokens || 160,
@@ -256,7 +260,33 @@ export class ProviderService {
         };
       }
     } catch (err) {
-      console.warn('Mistral direct network call fell back to local model synthesis:', err);
+      console.warn('Mistral direct network call fell back to backend proxy:', err);
+    }
+
+    // Backend proxy fallback
+    try {
+      const backendResp = await fetch('/api/ai/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: opts.prompt,
+          model: targetModel,
+          systemInstruction: opts.systemInstruction
+        })
+      });
+      if (backendResp.ok) {
+        const data = await backendResp.json();
+        if (data.text) {
+          return {
+            text: data.text,
+            model: targetModel,
+            tokens: { prompt: 35, completion: 160, total: 195 },
+            durationMs: Date.now() - startTime
+          };
+        }
+      }
+    } catch {
+      // synthesis fallback
     }
 
     return this.synthesizeUzbekFallback(opts.modelId, opts.prompt, startTime);
