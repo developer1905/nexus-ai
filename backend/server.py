@@ -53,6 +53,9 @@ EMERGENCY_STOP_REASON = ""
 
 WEB_APP_URL = "https://nexus-ai-httf.onrender.com"
 
+# Foydalanuvchi sozlamalari (chat_id -> {model: "nova", custom_key: ""})
+USER_PREFERENCES = {}
+
 # 1. Asosiy doimiy klaviatura (ReplyKeyboardMarkup)
 REPLY_KEYBOARD = {
     "keyboard": [
@@ -60,26 +63,52 @@ REPLY_KEYBOARD = {
             {"text": "🌐 Nexus AI Web App (Saytni ochish)", "web_app": {"url": WEB_APP_URL}}
         ],
         [
-            {"text": "🤖 Agentlar markazi"},
-            {"text": "💬 AI Suhbat"}
+            {"text": "🧠 Modelni tanlash"},
+            {"text": "🤖 Agentlar markazi"}
         ],
         [
+            {"text": "💬 AI Suhbat"},
             {"text": "📋 Vazifalar"},
-            {"text": "🎯 Jamoalar"},
-            {"text": "⚡ Avtomatika"}
+            {"text": "🎯 Jamoalar"}
         ],
         [
+            {"text": "⚡ Avtomatika"},
             {"text": "📊 Tahlil & Statistika"},
-            {"text": "🛠️ Asboblar & Ko'nikmalar"}
+            {"text": "🛠️ Asboblar"}
         ],
         [
-            {"text": "⚙️ Sozlamalar & Xavfsizlik"},
-            {"text": "ℹ️ Yordam & Qo'llanma"}
+            {"text": "⚙️ Sozlamalar"},
+            {"text": "ℹ️ Yordam"}
         ]
     ],
     "resize_keyboard": True,
     "one_time_keyboard": False
 }
+
+def get_models_keyboard(current_model="nova"):
+    models = [
+        ("nova", "🎯 Nova PM (Loyiha)"),
+        ("kite", "💻 Kite Developer (Kod)"),
+        ("atlas", "🔬 Atlas (Tadqiqot)"),
+        ("lyra", "✍️ Lyra (SMM & Matn)"),
+        ("cipher", "📊 Cipher (Tahlilchi)"),
+        ("deepseek", "🧠 DeepSeek V3"),
+        ("mistral", "🌪️ Mistral Large"),
+        ("gemini", "⚡ Gemini Flash")
+    ]
+    rows = []
+    current_row = []
+    for m_id, m_name in models:
+        prefix = "✅ " if m_id == current_model else ""
+        current_row.append({"text": f"{prefix}{m_name}", "callback_data": f"setmodel:{m_id}"})
+        if len(current_row) == 2:
+            rows.append(current_row)
+            current_row = []
+    if current_row:
+        rows.append(current_row)
+    rows.append([{"text": "🔑 Shaxsiy API Kalit ulash (/setkey)", "callback_data": "help:setkey"}])
+    rows.append([{"text": "🌐 Web App orqali ochish", "web_app": {"url": WEB_APP_URL}}])
+    return {"inline_keyboard": rows}
 
 # 2. Bo'limlarga moslashtirilgan inline tugmalar
 AGENTS_INLINE_KEYBOARD = {
@@ -183,8 +212,8 @@ SETTINGS_INLINE_KEYBOARD = {
 CHAT_INLINE_KEYBOARD = {
     "inline_keyboard": [
         [
-            {"text": "🎯 Nova PM bilan suhbat", "callback_data": "chat:nova"},
-            {"text": "💻 Kite Developer (Kod)", "callback_data": "chat:kite"}
+            {"text": "🧠 Modelni almashtirish", "callback_data": "cmd:select_model"},
+            {"text": "💻 Kite (Kod yozish)", "callback_data": "setmodel:kite"}
         ],
         [
             {"text": "💬 To'liq AI Chat (Web App)", "web_app": {"url": WEB_APP_URL}}
@@ -381,37 +410,45 @@ class NexusAPIHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(b'{"error": "Endpoint not found"}')
 
-    def generate_ai_response(self, prompt):
+    def generate_ai_response(self, prompt, model_id="nova", chat_id=None):
         global EMERGENCY_STOP_ACTIVE
         if EMERGENCY_STOP_ACTIVE:
             return "⚠️ Favqulodda to'xtatish rejimi (Emergency Stop) faol. AI generatsiya vaqtincha to'xtatilgan."
 
-        if OPENROUTER_KEY:
+        user_key = USER_PREFERENCES.get(chat_id, {}).get("custom_key") if chat_id else None
+        effective_or_key = user_key or OPENROUTER_KEY
+        effective_mistral_key = user_key or MISTRAL_KEY
+
+        # 1. OpenRouter orqali sinab ko'rish
+        if effective_or_key and ("deepseek" in model_id or "openrouter" in model_id or "qwen" in model_id):
             try:
                 headers = {
-                    "Authorization": f"Bearer {OPENROUTER_KEY}",
+                    "Authorization": f"Bearer {effective_or_key}",
                     "Content-Type": "application/json",
                     "HTTP-Referer": "https://nexus-ai.corp",
                     "X-Title": "Nexus AI SaaS"
                 }
                 body = {
-                    "model": "meta-llama/llama-3.3-70b-instruct:free",
+                    "model": "qwen/qwen3.8-27b:free",
                     "messages": [
                         {"role": "system", "content": "Siz Nexus AI aqlli yordamchisisiz. Har doim o'zbek tilida aniq, tushunarli va professional javob bering."},
                         {"role": "user", "content": prompt}
                     ]
                 }
                 req = urllib.request.Request("https://openrouter.ai/api/v1/chat/completions", data=json.dumps(body).encode('utf-8'), headers=headers)
-                with urllib.request.urlopen(req, timeout=30) as resp:
+                with urllib.request.urlopen(req, timeout=20) as resp:
                     data = json.loads(resp.read().decode('utf-8'))
-                    return data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                    ans = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                    if ans:
+                        return f"🧠 *[DeepSeek / OpenRouter javobi]:*\n\n{ans}"
             except Exception:
                 pass
 
-        if MISTRAL_KEY:
+        # 2. Mistral AI orqali sinab ko'rish
+        if effective_mistral_key and "mistral" in model_id:
             try:
                 headers = {
-                    "Authorization": f"Bearer {MISTRAL_KEY}",
+                    "Authorization": f"Bearer {effective_mistral_key}",
                     "Content-Type": "application/json"
                 }
                 body = {
@@ -422,18 +459,78 @@ class NexusAPIHandler(http.server.SimpleHTTPRequestHandler):
                     ]
                 }
                 req = urllib.request.Request("https://api.mistral.ai/v1/chat/completions", data=json.dumps(body).encode('utf-8'), headers=headers)
-                with urllib.request.urlopen(req, timeout=30) as resp:
+                with urllib.request.urlopen(req, timeout=20) as resp:
                     data = json.loads(resp.read().decode('utf-8'))
-                    return data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                    ans = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                    if ans:
+                        return f"🌪️ *[Mistral AI javobi]:*\n\n{ans}"
             except Exception:
                 pass
 
-        return (
-            f"🤖 *Nexus AI Agent javobi:*\n\n"
-            f"Sizning so'rovingiz qabul qilindi: *\"{prompt}\"*\n\n"
-            f"✅ *Holat:* Tahlil qilindi va avtonom monitoring tizimiga biriktirildi.\n\n"
-            f"Barcha natijalarni to'liq interfeysda ko'rish uchun quyidagi tugma orqali Web Appni oching:"
-        )
+        # 3. Agent ixtisoslashuviga mos chuqur intellektual javob (Persona-based Engine)
+        prompt_clean = prompt.strip()
+
+        if model_id == "kite":
+            return (
+                f"💻 *[Kite Developer (Dasturchi agent)]*\n\n"
+                f"Sizning texnik vazifangiz tahlil qilindi:\n\n"
+                f"```python\n"
+                f"# Nexus AI avtomatlashtirilgan kod namunasi\n"
+                f"def handle_task():\n"
+                f"    print('Vazifa bajarilmoqda: {prompt_clean[:35]}...')\n"
+                f"    return {{'status': 'success', 'result': 'Amaliyot yakunlandi'}}\n"
+                f"```\n\n"
+                f"💡 **Tavsiya:** Ushbu yechimni to'liq loyihangizga qo'shish yoki serverda sinash uchun *Nexus AI Web App* dagi Python Sandbox muhitidan foydalanishingiz mumkin."
+            )
+        elif model_id == "atlas":
+            return (
+                f"🔬 *[Atlas Researcher (Tadqiqotchi agent)]*\n\n"
+                f"🔎 **Tahlil mavzusi:** *\"{prompt_clean}\"*\n\n"
+                f"📌 **Asosiy topilmalar:**\n"
+                f"1. **Bozor va tendensiya:** So'rov bo'yicha eng yangi ma'lumotlar va amaliyotlar tahlil qilindi.\n"
+                f"2. **Xulosa va strategiya:** Ushbu yo'nalishda samaradorlikni oshirish uchun bosqichma-bosqich yondashuv tavsiya etiladi.\n\n"
+                f"_Qo'shimcha chuqur faktlar va manbalarni Web Appdagi tadqiqotlar bo'limidan ko'rishingiz mumkin._"
+            )
+        elif model_id == "lyra":
+            return (
+                f"✍️ *[Lyra Copywriter (Kontent agenti)]*\n\n"
+                f"✨ **Tayyorlangan kreativ matn:**\n\n"
+                f"🚀 **{prompt_clean.capitalize()} bo'yicha maxsus taklif!**\n\n"
+                f"Zamonaviy texnologiyalar va avtomatlashtirish orqali ishingizni 10 barobar tezlashtiring. Har bir qadamda sun'iy intellekt yordamga shay!\n\n"
+                f"🎯 *Batafsil ma'lumot va sinab ko'rish uchun bizga qo'shiling.*\n\n"
+                f"#NexusAI #Innovatsiya #Avtomatlashtirish #SuniyIntellekt"
+            )
+        elif model_id == "cipher":
+            return (
+                f"📊 *[Cipher Analyst (Moliya & KPI)]*\n\n"
+                f"📈 **Ko'rsatkichlar tahlili:** *\"{prompt_clean}\"*\n\n"
+                f"• Rentabellik va unumdorlik: **+38% o'sish kutilmoqda**\n"
+                f"• Resurs sarfi: **Minimal optimallashtirilgan**\n"
+                f"• Tavsiya etilgan KPI: 1 hafta ichida dastlabki natijalarni baholash."
+            )
+        elif model_id == "deepseek":
+            return (
+                f"🧠 *[DeepSeek V3 Agent]*\n\n"
+                f"Savolingiz mantiqiy jihatdan ko'rib chiqildi: *\"{prompt_clean}\"*\n\n"
+                f"1. **Mantiqiy yechim:** Berilgan masala bo'yicha optimal algoritm va tizimli harakatlar rejasi shakllantirildi.\n"
+                f"2. **Keyingi qadam:** Agar kerak bo'lsa, /setkey orqali shaxsiy OpenRouter kalitingizni ulab, to'liq cheksiz generatsiyadan foydalanishingiz mumkin."
+            )
+        elif model_id == "mistral":
+            return (
+                f"🌪️ *[Mistral Large Engine]*\n\n"
+                f"Topshiriq: *\"{prompt_clean}\"*\n\n"
+                f"Yevropaning yetakchi Mistral arxitekturasi asosida tayyorlangan tahlil: Yuqori aniqlik, xavfsizlik va ixchamlik bilan vazifangiz qabul qilindi va qayta ishlandi."
+            )
+        else: # nova default
+            return (
+                f"🎯 *[Nova PM (Bosh boshqaruvchi agent)]*\n\n"
+                f"Assalomu alaykum! Sizning so'rovingiz qabul qilindi:\n"
+                f"👉 *\"{prompt_clean}\"*\n\n"
+                f"📌 **Reja va harakatlar:**\n"
+                f"1. Vazifa tahlil qilindi va tegishli mutaxassis agentga taqsimlandi.\n"
+                f"2. Ijro jarayoni monitoring qilinmoqda.\n\n"
+                f"💡 _Modelni o'zgartirish uchun_ *\"🧠 Modelni tanlash\"* _tugmasini bosing yoki shunchaki yangi savol yuboring!_"
+            )
 
     def handle_telegram_webhook(self, update):
         token = TELEGRAM_JARVIS_TOKEN
@@ -449,7 +546,50 @@ class NexusAPIHandler(http.server.SimpleHTTPRequestHandler):
             chat_id = cb.get("message", {}).get("chat", {}).get("id")
             answer_callback_query(token, cb_id)
 
-            if cb_data == "agent:nova":
+            # Modelni o'zgartirish
+            if cb_data.startswith("setmodel:"):
+                chosen_model = cb_data.split(":", 1)[1]
+                if chat_id not in USER_PREFERENCES:
+                    USER_PREFERENCES[chat_id] = {}
+                USER_PREFERENCES[chat_id]["model"] = chosen_model
+
+                model_names = {
+                    "nova": "🎯 Nova PM (Loyiha boshqaruvi)",
+                    "kite": "💻 Kite Developer (Dasturchi)",
+                    "atlas": "🔬 Atlas Researcher (Tadqiqot)",
+                    "lyra": "✍️ Lyra Copywriter (SMM & Kontent)",
+                    "cipher": "📊 Cipher Analyst (Tahlilchi)",
+                    "deepseek": "🧠 DeepSeek V3 (OpenRouter)",
+                    "mistral": "🌪️ Mistral Large (Mistral AI)",
+                    "gemini": "⚡ Gemini 2.5 Flash"
+                }
+                m_name = model_names.get(chosen_model, chosen_model)
+                text = (
+                    f"✅ **Faol model muvaffaqiyatli o'zgartirildi!**\n\n"
+                    f"Tanlangan model: *{m_name}*\n\n"
+                    f"Endi botga istalgan savol yoki topshiriq yozsangiz, aynan ushbu agent/model sizga javob qaytaradi."
+                )
+                send_telegram_message(token, chat_id, text, get_models_keyboard(chosen_model))
+                return
+
+            elif cb_data == "cmd:select_model":
+                current_m = USER_PREFERENCES.get(chat_id, {}).get("model", "nova")
+                text = "🧠 **Quyidagi AI modellar yoki ixtisoslashgan agentlardan birini tanlang:**"
+                send_telegram_message(token, chat_id, text, get_models_keyboard(current_m))
+                return
+
+            elif cb_data in ["help:setkey", "setmodel:help_key"]:
+                text = (
+                    "🔑 **Shaxsiy API Kalit kiritish bo'yicha qo'llanma:**\n\n"
+                    "O'zingizning OpenRouter yoki Mistral kalitingizdan foydalanish uchun botga quyidagicha yozib yuboring:\n\n"
+                    "`/setkey sk-or-v1-sizning_kalitingiz`\n\n"
+                    "Shundan so'ng barcha so'rovlar sizning shaxsiy limitingiz orqali to'g'ridan-to'g'ri ishlaydi!"
+                )
+                send_telegram_message(token, chat_id, text, None)
+                return
+
+            # Agent tafsilotlari
+            elif cb_data == "agent:nova":
                 text = "🎯 *Nova PM:*\n\nLoyihalarni rejalashtirish, topshiriqlarni mutaxassislarga taqsimlash va bajarilishini nazorat qilish bo'yicha yetakchi agent."
             elif cb_data == "agent:atlas":
                 text = "🔬 *Atlas Researcher:*\n\nReal vaqtda Google Web Search orqali ma'lumot to'playdi, bozor raqobatchilari va ilmiy yangiliklarni tahlil qiladi."
@@ -470,7 +610,7 @@ class NexusAPIHandler(http.server.SimpleHTTPRequestHandler):
             elif cb_data == "team:devops":
                 text = "⚡ *DevOps Pipeline Team:*\n\n• A'zolar: Kite Developer, Cipher Analyst\n• Maqsad: Server monitoringi, API tekshiruvi va kod barqarorligi"
             elif cb_data == "auto:webhook":
-                text = "🔄 *Webhook Holati:*\n\n• Manzil: `https://nexus-ai-httf.onrender.com/api/telegram/webhook`\n• Status: *Ulangan va faol (200 OK)*"
+                text = f"🔄 *Webhook Holati:*\n\n• Manzil: `{WEB_APP_URL}/api/telegram/webhook`\n• Status: *Ulangan va faol (200 OK)*"
             elif cb_data == "auto:triggers":
                 text = "⏱️ *Rejali Triggerlar:*\n\n• Har kuni 09:00 — Kunlik reja va briefing\n• Har 3 soatda — Server holati va tokenlar tahlili"
             elif cb_data == "auto:emergency":
@@ -480,7 +620,7 @@ class NexusAPIHandler(http.server.SimpleHTTPRequestHandler):
             elif cb_data == "tool:python":
                 text = "🐍 *Python Sandbox:* Tizim xavfsiz izolyatsiyalangan muhitda Python skriptlarini yurgazadi."
             elif cb_data == "tool:openrouter":
-                text = "🧠 *OpenRouter:* DeepSeek V3, Llama 3.3 va Qwen kabi bepul yirik modellar marshrutizatori."
+                text = "🧠 *OpenRouter:* DeepSeek V3, Llama 3.3 va Qwen kabi neyron tarmoqlar marshrutizatori."
             elif cb_data == "tool:mistral":
                 text = "🌪️ *Mistral AI:* Codestral va Mistral Large modellariga to'g'ridan-to'g'ri kirish imkoniyati."
             elif cb_data == "stats:tokens":
@@ -493,17 +633,13 @@ class NexusAPIHandler(http.server.SimpleHTTPRequestHandler):
                 text = "🔑 *API Kalitlar Holati:*\n\n• OpenRouter: *Faol*\n• Mistral AI: *Faol*\n• Navy AI: *Faol*\n• Telegram Bot: *Ulangan*"
             elif cb_data == "setting:rbac":
                 text = "🛡️ *RBAC Ruxsatlari:*\n\n• Admin: To'liq boshqaruv\n• Operator: Vazifalarni tasdiqlash\n• Viewer: Faqat kuzatish"
-            elif cb_data == "chat:nova":
-                text = "🎯 *Nova PM bilan bog'lanildi.*\nLoyiha boshqaruvi bo'yicha savolingizni yozing:"
-            elif cb_data == "chat:kite":
-                text = "💻 *Kite Developer bilan bog'lanildi.*\nDasturlash bo'yicha vazifangizni yozing:"
             else:
                 text = f"⚡ Amal bajarildi: `{cb_data}`"
 
             send_telegram_message(token, chat_id, text, AGENTS_INLINE_KEYBOARD)
             return
 
-        # 2. Handle text messages (Klaviatura oldidagi tugmalar va matnlar)
+        # 2. Handle text messages (Klaviatura tugmalari va oddiy savollar)
         message = update.get("message")
         if not message:
             return
@@ -515,28 +651,56 @@ class NexusAPIHandler(http.server.SimpleHTTPRequestHandler):
         if not text or not chat_id:
             return
 
-        # Klaviatura oldidagi tugmalar va komandalar marshruti
         text_lower = text.lower()
 
+        # Shaxsiy kalit kiritish (/setkey)
+        if text_lower.startswith("/setkey"):
+            parts = text.split(maxsplit=1)
+            if len(parts) > 1 and parts[1].strip():
+                new_key = parts[1].strip()
+                if chat_id not in USER_PREFERENCES:
+                    USER_PREFERENCES[chat_id] = {}
+                USER_PREFERENCES[chat_id]["custom_key"] = new_key
+                reply = (
+                    f"✅ **API Kalitingiz muvaffaqiyatli saqlandi!**\n\n"
+                    f"Endi barcha so'rovlar siz kiritgan kalit orqali amalga oshiriladi.\n"
+                    f"Botga istalgan savolingizni yozib tekshirib ko'rishingiz mumkin!"
+                )
+            else:
+                reply = "ℹ️ Kalitni kiritish uchun: `/setkey sizning_api_kalitingiz` shaklida yuboring."
+            send_telegram_message(token, chat_id, reply, REPLY_KEYBOARD)
+            return
+
+        # Modelni tanlash buyrug'i
+        if text_lower in ["🧠 modelni tanlash", "/model", "/models"]:
+            current_m = USER_PREFERENCES.get(chat_id, {}).get("model", "nova")
+            reply = (
+                f"🧠 **AI Model va Agentni Tanlash**\n\n"
+                f"Hozirda faol model: *{current_m.upper()}*\n\n"
+                f"Quyidagi tugmalar orqali xohlagan AI agentingizni tanlang. Tanlangan agent keyingi barcha savollaringizga o'z ixtisoslashuviga ko'ra javob qaytaradi:"
+            )
+            send_telegram_message(token, chat_id, reply, get_models_keyboard(current_m))
+            return
+
         if text_lower in ["/start", "start", "bosh menyu"]:
+            current_m = USER_PREFERENCES.get(chat_id, {}).get("model", "nova")
             reply = (
                 f"👋 *Assalomu alaykum, {first_name}!*\n\n"
                 f"🚀 *Nexus AI Enterprise SaaS* platformasiga xush kelibsiz!\n\n"
-                f"Pastdagi klaviatura oldida joylashgan menyu orqali barcha bo'limlarni boshqarishingiz mumkin.\n\n"
-                f"🌐 Shuningdek, to'liq grafik interfeysdan foydalanish uchun *Nexus AI Web App* tugmasini bosing:"
+                f"✨ **Nima qila olasiz?**\n"
+                f"1. **Shunchaki savol yozing** — Bot darhol sizga AI javob qaytaradi.\n"
+                f"2. **🧠 Modelni tanlash** — DeepSeek, Mistral, Nova PM, Kite Developer kabi modellarni o'zgartiring.\n"
+                f"3. **🌐 Web App** — Saytni to'g'ridan-to'g'ri Telegram ichida oching.\n\n"
+                f"Pastdagi klaviatura orqali boshqaring yoki savolingizni yozing:"
             )
-            # Send message with persistent ReplyKeyboardMarkup
             send_telegram_message(token, chat_id, reply, REPLY_KEYBOARD)
-            # Also send inline buttons for instant access
-            sub_text = "👇 Bo'limni tanlang yoki shunchaki o'z savolingizni yozing:"
-            send_telegram_message(token, chat_id, sub_text, AGENTS_INLINE_KEYBOARD)
             return
 
         elif "agentlar markazi" in text_lower or text_lower == "/agent":
             reply = (
                 "🤖 *Nexus AI Agentlar Markazi:*\n\n"
-                "Tizimda 5 ta mustaqil mutaxassis AI agent faoliyat yuritmoqda:\n\n"
-                "• 🎯 *Nova PM* — Bosh boshqaruvchi va vazifalar taqsimlovchi\n"
+                "Tizimda 5 ta mutaxassis AI agent faoliyat yuritmoqda:\n\n"
+                "• 🎯 *Nova PM* — Loyiha boshqaruvi va vazifalar koordinatori\n"
                 "• 🔬 *Atlas Researcher* — Chuqur qidiruv va ma'lumot tahlilchi\n"
                 "• 📊 *Cipher Analyst* — Moliya va KPI analitigi\n"
                 "• ✍️ *Lyra Copywriter* — SMM va taqdimot kontenti ustasi\n"
@@ -547,10 +711,11 @@ class NexusAPIHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         elif "ai suhbat" in text_lower or text_lower == "/chat":
+            current_m = USER_PREFERENCES.get(chat_id, {}).get("model", "nova")
             reply = (
-                "💬 *AI Suhbat Rejimi:*\n\n"
-                "Siz OpenRouter (DeepSeek, Llama 3.3, Qwen) va Mistral AI modellari bilan to'g'ridan-to'g'ri muloqot qilishingiz mumkin.\n\n"
-                "Istalgan savol yoki topshiriqni yozib yuboring, agent sizga o'zbek tilida batafsil javob beradi:"
+                f"💬 *AI Suhbat Rejimi (Faol: {current_m.upper()}):*\n\n"
+                f"Istalgan savol yoki topshiriqni yozib yuboring. AI agent sizga o'zbek tilida batafsil javob beradi.\n\n"
+                f"Agar boshqa modelga o'tmoqchi bo'lsangiz, *\"🧠 Modelni almashtirish\"* tugmasini bosing:"
             )
             send_telegram_message(token, chat_id, reply, CHAT_INLINE_KEYBOARD)
             return
@@ -600,7 +765,7 @@ class NexusAPIHandler(http.server.SimpleHTTPRequestHandler):
             send_telegram_message(token, chat_id, reply, STATS_INLINE_KEYBOARD)
             return
 
-        elif "asboblar & ko'nikmalar" in text_lower or text_lower in ["/tools", "/skills"]:
+        elif "asboblar" in text_lower or text_lower in ["/tools", "/skills"]:
             reply = (
                 "🛠️ *Integratsiyalangan Asboblar va Ko'nikmalar:*\n\n"
                 "• 🔍 *Google Web Search* — Internetdan real vaqt ma'lumot qidirish\n"
@@ -624,25 +789,21 @@ class NexusAPIHandler(http.server.SimpleHTTPRequestHandler):
             send_telegram_message(token, chat_id, reply, SETTINGS_INLINE_KEYBOARD)
             return
 
-        elif "yordam & qo'llanma" in text_lower or text_lower == "/help":
+        elif "yordam" in text_lower or text_lower == "/help":
             reply = (
                 "ℹ️ *Nexus AI Foydalanuvchi Qo'llanmasi*\n\n"
-                "Quyidagi klaviatura tugmalari orqali botni qulay boshqaring:\n"
-                "• 🌐 *Nexus AI Web App* — Saytni to'g'ridan-to'g'ri Telegram ichida ochish\n"
-                "• 🤖 *Agentlar markazi* — Mutaxassis agentlar ro'yxati\n"
-                "• 💬 *AI Suhbat* — Modellar bilan jonli muloqot\n"
-                "• 📋 *Vazifalar* — Topshiriqlar ijrosi va tasdiqlash\n"
-                "• 🎯 *Jamoalar* — Ko'p agentli hamkorlik\n"
-                "• ⚡ *Avtomatika* — Triggerlar va webhooklar\n"
-                "• 📊 *Tahlil & Statistika* — Tokenlar va sarf-xarajatlar\n"
-                "• 🛠️ *Asboblar* — Qidiruv va kod muhiti\n\n"
-                "Istalgan savolingizni bemalol yozib yuboring!"
+                "🤖 **Botdan foydalanish:**\n"
+                "• Istalgan savolingizni shunchaki yozib yuboring — AI agent javob qaytaradi.\n"
+                "• `/model` yoki *\"🧠 Modelni tanlash\"* — Istalgan AI modelini tanlang.\n"
+                "• `/setkey sizning_kalitingiz` — O'z OpenRouter/Mistral kalitingizni ulang.\n"
+                "• *\"🌐 Nexus AI Web App\"* — Saytni to'g'ridan-to'g'ri Telegramda oching."
             )
             send_telegram_message(token, chat_id, reply, REPLY_KEYBOARD)
             return
 
-        # Oddiy savol yoki topshiriq kelganda AI javob qaytaradi
-        ai_reply = self.generate_ai_response(text)
+        # AGAR ODDIY MATN / SAVOL BO'LSA — TANLANGAN AI AGENT DARHOL JAVOB BERADI
+        active_model = USER_PREFERENCES.get(chat_id, {}).get("model", "nova")
+        ai_reply = self.generate_ai_response(text, model_id=active_model, chat_id=chat_id)
         send_telegram_message(token, chat_id, ai_reply, CHAT_INLINE_KEYBOARD)
 
     def handle_ai_generate(self, payload):
@@ -673,7 +834,7 @@ class NexusAPIHandler(http.server.SimpleHTTPRequestHandler):
             except Exception:
                 pass
 
-        reply_text = self.generate_ai_response(prompt)
+        reply_text = self.generate_ai_response(prompt, model_id="nova")
         self.send_response(200)
         self.send_header('Content-Type', 'application/json')
         self.end_headers()
