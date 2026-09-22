@@ -91,7 +91,9 @@ export const ChatView: React.FC = () => {
                   <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
                   <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash Lite</option>
                 </optgroup>
-                <optgroup label="OpenRouter (Bepul Modellar)">
+                <optgroup label="OpenRouter (Faol Bepul Real AI)">
+                  <option value="nex-agi/nex-n2.5-pro:free">Nex-AGI Pro (Bepul & Real AI)</option>
+                  <option value="nex-agi/nex-n2.5-mini:free">Nex-AGI Fast Mini (Bepul)</option>
                   <option value="deepseek/deepseek-r1:free">DeepSeek R1 (Bepul)</option>
                   <option value="deepseek/deepseek-chat:free">DeepSeek V3 (Bepul)</option>
                   <option value="meta-llama/llama-3.3-70b-instruct:free">Llama 3.3 70B (Bepul)</option>
