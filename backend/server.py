@@ -87,6 +87,7 @@ REPLY_KEYBOARD = {
 
 def get_models_keyboard(current_model="nova"):
     models = [
+        ("hermes", "🪽 Hermes (Xabarchi)"),
         ("nova", "🎯 Nova PM (Loyiha)"),
         ("kite", "💻 Kite Developer (Kod)"),
         ("atlas", "🔬 Atlas (Tadqiqot)"),
@@ -114,15 +115,18 @@ def get_models_keyboard(current_model="nova"):
 AGENTS_INLINE_KEYBOARD = {
     "inline_keyboard": [
         [
-            {"text": "🎯 Nova PM", "callback_data": "agent:nova"},
-            {"text": "🔬 Atlas Researcher", "callback_data": "agent:atlas"}
+            {"text": "🪽 Hermes Dispatcher", "callback_data": "agent:hermes"},
+            {"text": "🎯 Nova PM", "callback_data": "agent:nova"}
         ],
         [
-            {"text": "📊 Cipher Analyst", "callback_data": "agent:cipher"},
-            {"text": "✍️ Lyra Copywriter", "callback_data": "agent:lyra"}
+            {"text": "🔬 Atlas Researcher", "callback_data": "agent:atlas"},
+            {"text": "📊 Cipher Analyst", "callback_data": "agent:cipher"}
         ],
         [
-            {"text": "💻 Kite Developer", "callback_data": "agent:kite"},
+            {"text": "✍️ Lyra Copywriter", "callback_data": "agent:lyra"},
+            {"text": "💻 Kite Developer", "callback_data": "agent:kite"}
+        ],
+        [
             {"text": "🚀 Web Appda ochish", "web_app": {"url": WEB_APP_URL}}
         ]
     ]
@@ -470,7 +474,18 @@ class NexusAPIHandler(http.server.SimpleHTTPRequestHandler):
         # 3. Agent ixtisoslashuviga mos chuqur intellektual javob (Persona-based Engine)
         prompt_clean = prompt.strip()
 
-        if model_id == "kite":
+        if model_id == "hermes":
+            return (
+                f"🪽 *[Hermes Agent (Tezkor Xabarchi & Integrator)]*\n\n"
+                f"⚡ **Xabar qabul qilindi va kanallarga yo'naltirildi:**\n"
+                f"👉 *\"{prompt_clean}\"*\n\n"
+                f"📡 **Marshrutlash va integratsiya holati:**\n"
+                f"• **Telegram Bot & Web App:** Sinxronizatsiya faol (22ms)\n"
+                f"• **Webhook Dispatcher:** Paketlar to'liq yetkazildi\n"
+                f"• **Inter-Agent aloqa:** Barcha mutaxassis agentlarga signal uzatildi\n\n"
+                f"✅ _Hermes: Xabaringiz barcha ulangan tizimlarga zudlik bilan yetkazildi!_"
+            )
+        elif model_id == "kite":
             return (
                 f"💻 *[Kite Developer (Dasturchi agent)]*\n\n"
                 f"Sizning texnik vazifangiz tahlil qilindi:\n\n"
@@ -554,6 +569,7 @@ class NexusAPIHandler(http.server.SimpleHTTPRequestHandler):
                 USER_PREFERENCES[chat_id]["model"] = chosen_model
 
                 model_names = {
+                    "hermes": "🪽 Hermes Agent (Xabarchi & Integrator)",
                     "nova": "🎯 Nova PM (Loyiha boshqaruvi)",
                     "kite": "💻 Kite Developer (Dasturchi)",
                     "atlas": "🔬 Atlas Researcher (Tadqiqot)",
@@ -589,6 +605,8 @@ class NexusAPIHandler(http.server.SimpleHTTPRequestHandler):
                 return
 
             # Agent tafsilotlari
+            elif cb_data == "agent:hermes":
+                text = "🪽 *Hermes Agent:*\n\nBarcha kanallar (Telegram, Webhook, REST API, Web App) o'rtasida xabarlarni tezkor yetkazuvchi, bildirishnomalarni tartibga soluvchi va agentlararo aloqani sinxronlashtiruvchi universal xabarchi agent."
             elif cb_data == "agent:nova":
                 text = "🎯 *Nova PM:*\n\nLoyihalarni rejalashtirish, topshiriqlarni mutaxassislarga taqsimlash va bajarilishini nazorat qilish bo'yicha yetakchi agent."
             elif cb_data == "agent:atlas":
@@ -699,7 +717,8 @@ class NexusAPIHandler(http.server.SimpleHTTPRequestHandler):
         elif "agentlar markazi" in text_lower or text_lower == "/agent":
             reply = (
                 "🤖 *Nexus AI Agentlar Markazi:*\n\n"
-                "Tizimda 5 ta mutaxassis AI agent faoliyat yuritmoqda:\n\n"
+                "Tizimda 6 ta mutaxassis AI agent faoliyat yuritmoqda:\n\n"
+                "• 🪽 *Hermes Agent* — Tezkor xabarchi, dispatcher va kanal integratori\n"
                 "• 🎯 *Nova PM* — Loyiha boshqaruvi va vazifalar koordinatori\n"
                 "• 🔬 *Atlas Researcher* — Chuqur qidiruv va ma'lumot tahlilchi\n"
                 "• 📊 *Cipher Analyst* — Moliya va KPI analitigi\n"

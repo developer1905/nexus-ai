@@ -362,6 +362,31 @@ var INITIAL_AGENTS = [
       avgLatencyMs: 65,
       successRatePct: 98.4
     }
+  },
+  {
+    id: "agent-hermes",
+    name: "Hermes Agent",
+    role: "Dispatcher & Cross-Platform Messenger",
+    avatar: "\u{1FABD}",
+    systemPrompt: "Siz Hermes avtonom xabarchi va integratsiya agentsiz. Siz barcha kanallar (Telegram, Webhook, REST API, Web App) o\u2018rtasida xabarlarni tezkor uzatish, bildirishnomalarni tartibga solish, inter-agent muloqotini sinxronlashtirish va foydalanuvchiga eng tezkor javoblarni taqdim etish uchun mas'ulsiz. Har doim o\u2018zbek tilida lo\u2018nda, tezkor va aniq javob bering.",
+    modelId: "navy-fast-v1",
+    temperature: 0.3,
+    maxTokens: 4096,
+    skills: ["skill-telegram-format", "skill-task-decomp"],
+    tools: ["tool-web-search"],
+    knowledgeBases: [],
+    assignedProjects: ["proj-core"],
+    status: "active",
+    createdAt: "2025-02-05",
+    updatedAt: "2025-02-05",
+    metrics: {
+      tasksCompleted: 350,
+      messagesHandled: 1820,
+      tokensConsumed: 198e4,
+      costUSD: 0.05,
+      avgLatencyMs: 22,
+      successRatePct: 99.8
+    }
   }
 ];
 var INITIAL_TEAMS = [
@@ -374,10 +399,11 @@ var INITIAL_TEAMS = [
     createdAt: "2025-01-20",
     members: [
       { agentId: "agent-chief-pm", roleInTeam: "Manager", order: 1 },
-      { agentId: "agent-researcher", roleInTeam: "Researcher", order: 2 },
-      { agentId: "agent-analyst", roleInTeam: "Analyst", order: 3 },
-      { agentId: "agent-copywriter", roleInTeam: "Writer", order: 4 },
-      { agentId: "agent-developer", roleInTeam: "Reviewer", order: 5 }
+      { agentId: "agent-hermes", roleInTeam: "Specialist", order: 2 },
+      { agentId: "agent-researcher", roleInTeam: "Researcher", order: 3 },
+      { agentId: "agent-analyst", roleInTeam: "Analyst", order: 4 },
+      { agentId: "agent-copywriter", roleInTeam: "Writer", order: 5 },
+      { agentId: "agent-developer", roleInTeam: "Reviewer", order: 6 }
     ]
   }
 ];
@@ -658,7 +684,7 @@ var INITIAL_PROJECTS = [
     description: "Asosiy AI agentlar va Telegram ekotizimi",
     color: "#3B82F6",
     createdAt: "2025-01-01",
-    agentIds: ["agent-chief-pm", "agent-researcher", "agent-analyst", "agent-copywriter", "agent-developer"]
+    agentIds: ["agent-chief-pm", "agent-hermes", "agent-researcher", "agent-analyst", "agent-copywriter", "agent-developer"]
   }
 ];
 var INITIAL_AUTOMATIONS = [
@@ -2655,11 +2681,12 @@ Istalgan savolingizni yozing yoki vazifa bering. Agent sizga o\u2018zbek tilida 
         return {
           text: `\u{1F916} *Faol Agentlar:*
 
-1. \u{1F3AF} **Nova PM** \u2014 Bosh boshqaruvchi va vazifalar taqsimlovchisi
-2. \u{1F52C} **Atlas Researcher** \u2014 Internetdan chuqur tadqiqot olib boruvchi
-3. \u{1F4CA} **Cipher Analyst** \u2014 Ma'lumotlar va KPI tahlilchisi
-4. \u270D\uFE0F **Lyra Copywriter** \u2014 O\u2018zbekcha post va hisobotlar muallifi
-5. \u{1F4BB} **Kite Developer** \u2014 Python kodlari va texnik maslahatchi`,
+1. \u{1FABD} **Hermes Agent** \u2014 Tezkor xabarchi, dispatcher va kanal integratori
+2. \u{1F3AF} **Nova PM** \u2014 Bosh boshqaruvchi va vazifalar taqsimlovchisi
+3. \u{1F52C} **Atlas Researcher** \u2014 Internetdan chuqur tadqiqot olib boruvchi
+4. \u{1F4CA} **Cipher Analyst** \u2014 Ma'lumotlar va KPI tahlilchisi
+5. \u270D\uFE0F **Lyra Copywriter** \u2014 O\u2018zbekcha post va hisobotlar muallifi
+6. \u{1F4BB} **Kite Developer** \u2014 Python kodlari va texnik maslahatchi`,
           keyboard: this.getMainMenuKeyboard()
         };
       case "/tasks":
@@ -2744,7 +2771,7 @@ Istalgan savolingizni yozing yoki vazifa bering. Agent sizga o\u2018zbek tilida 
       return { text: `\u{1F3E0} Bosh menyuga qaytildi. Qanday yangi vazifa bor?` };
     }
     if (callbackData === "menu_agents") {
-      return { text: `\u{1F916} Barcha 5 ta mutaxassis agent to\u2018liq tayyor holatda.` };
+      return { text: `\u{1F916} Barcha mutaxassis agentlar (Hermes, Nova, Atlas, Cipher, Lyra, Kite) to\u2018liq tayyor holatda.` };
     }
     if (callbackData === "menu_chat") {
       return { text: `\u{1F4AC} AI suhbat maydoni. Istalgan topshiriqni bering:` };
@@ -3141,6 +3168,7 @@ ${res.text}`,
       className: "w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"
     },
     /* @__PURE__ */ React21.createElement("option", { value: "JARVIS (Universal Agent)" }, "\u{1F9BE} JARVIS (Universal Hamma Ishlar)"),
+    /* @__PURE__ */ React21.createElement("option", { value: "Hermes Agent (Xabarchi & Integrator)" }, "\u{1FABD} Hermes Agent (Xabarchi & Integrator)"),
     /* @__PURE__ */ React21.createElement("option", { value: "Nova PM (Manager)" }, "\u{1F3AF} Nova PM (Manager)"),
     /* @__PURE__ */ React21.createElement("option", { value: "Atlas Researcher" }, "\u{1F52C} Atlas Researcher"),
     /* @__PURE__ */ React21.createElement("option", { value: "Cipher Analyst" }, "\u{1F4CA} Cipher Analyst"),

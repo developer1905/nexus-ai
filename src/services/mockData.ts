@@ -378,6 +378,31 @@ export const INITIAL_AGENTS: Agent[] = [
       avgLatencyMs: 65,
       successRatePct: 98.4
     }
+  },
+  {
+    id: 'agent-hermes',
+    name: 'Hermes Agent',
+    role: 'Dispatcher & Cross-Platform Messenger',
+    avatar: '🪽',
+    systemPrompt: 'Siz Hermes avtonom xabarchi va integratsiya agentsiz. Siz barcha kanallar (Telegram, Webhook, REST API, Web App) o‘rtasida xabarlarni tezkor uzatish, bildirishnomalarni tartibga solish, inter-agent muloqotini sinxronlashtirish va foydalanuvchiga eng tezkor javoblarni taqdim etish uchun mas\'ulsiz. Har doim o‘zbek tilida lo‘nda, tezkor va aniq javob bering.',
+    modelId: 'navy-fast-v1',
+    temperature: 0.3,
+    maxTokens: 4096,
+    skills: ['skill-telegram-format', 'skill-task-decomp'],
+    tools: ['tool-web-search'],
+    knowledgeBases: [],
+    assignedProjects: ['proj-core'],
+    status: 'active',
+    createdAt: '2025-02-05',
+    updatedAt: '2025-02-05',
+    metrics: {
+      tasksCompleted: 350,
+      messagesHandled: 1820,
+      tokensConsumed: 1980000,
+      costUSD: 0.05,
+      avgLatencyMs: 22,
+      successRatePct: 99.8
+    }
   }
 ];
 
@@ -391,10 +416,11 @@ export const INITIAL_TEAMS: AgentTeam[] = [
     createdAt: '2025-01-20',
     members: [
       { agentId: 'agent-chief-pm', roleInTeam: 'Manager', order: 1 },
-      { agentId: 'agent-researcher', roleInTeam: 'Researcher', order: 2 },
-      { agentId: 'agent-analyst', roleInTeam: 'Analyst', order: 3 },
-      { agentId: 'agent-copywriter', roleInTeam: 'Writer', order: 4 },
-      { agentId: 'agent-developer', roleInTeam: 'Reviewer', order: 5 }
+      { agentId: 'agent-hermes', roleInTeam: 'Specialist', order: 2 },
+      { agentId: 'agent-researcher', roleInTeam: 'Researcher', order: 3 },
+      { agentId: 'agent-analyst', roleInTeam: 'Analyst', order: 4 },
+      { agentId: 'agent-copywriter', roleInTeam: 'Writer', order: 5 },
+      { agentId: 'agent-developer', roleInTeam: 'Reviewer', order: 6 }
     ]
   }
 ];
@@ -687,7 +713,7 @@ export const INITIAL_PROJECTS: Project[] = [
     description: 'Asosiy AI agentlar va Telegram ekotizimi',
     color: '#3B82F6',
     createdAt: '2025-01-01',
-    agentIds: ['agent-chief-pm', 'agent-researcher', 'agent-analyst', 'agent-copywriter', 'agent-developer']
+    agentIds: ['agent-chief-pm', 'agent-hermes', 'agent-researcher', 'agent-analyst', 'agent-copywriter', 'agent-developer']
   }
 ];
 

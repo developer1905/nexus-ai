@@ -869,6 +869,7 @@ export const TelegramView: React.FC = () => {
                 className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-white"
               >
                 <option value="JARVIS (Universal Agent)">🦾 JARVIS (Universal Hamma Ishlar)</option>
+                <option value="Hermes Agent (Xabarchi & Integrator)">🪽 Hermes Agent (Xabarchi & Integrator)</option>
                 <option value="Nova PM (Manager)">🎯 Nova PM (Manager)</option>
                 <option value="Atlas Researcher">🔬 Atlas Researcher</option>
                 <option value="Cipher Analyst">📊 Cipher Analyst</option>

@@ -150,11 +150,12 @@ export class TelegramService {
       case '/agent':
         return {
           text: `🤖 *Faol Agentlar:*\n\n` +
-                `1. 🎯 **Nova PM** — Bosh boshqaruvchi va vazifalar taqsimlovchisi\n` +
-                `2. 🔬 **Atlas Researcher** — Internetdan chuqur tadqiqot olib boruvchi\n` +
-                `3. 📊 **Cipher Analyst** — Ma'lumotlar va KPI tahlilchisi\n` +
-                `4. ✍️ **Lyra Copywriter** — O‘zbekcha post va hisobotlar muallifi\n` +
-                `5. 💻 **Kite Developer** — Python kodlari va texnik maslahatchi`,
+                `1. 🪽 **Hermes Agent** — Tezkor xabarchi, dispatcher va kanal integratori\n` +
+                `2. 🎯 **Nova PM** — Bosh boshqaruvchi va vazifalar taqsimlovchisi\n` +
+                `3. 🔬 **Atlas Researcher** — Internetdan chuqur tadqiqot olib boruvchi\n` +
+                `4. 📊 **Cipher Analyst** — Ma'lumotlar va KPI tahlilchisi\n` +
+                `5. ✍️ **Lyra Copywriter** — O‘zbekcha post va hisobotlar muallifi\n` +
+                `6. 💻 **Kite Developer** — Python kodlari va texnik maslahatchi`,
           keyboard: this.getMainMenuKeyboard()
         };
 
@@ -241,7 +242,7 @@ export class TelegramService {
       return { text: `🏠 Bosh menyuga qaytildi. Qanday yangi vazifa bor?` };
     }
     if (callbackData === 'menu_agents') {
-      return { text: `🤖 Barcha 5 ta mutaxassis agent to‘liq tayyor holatda.` };
+      return { text: `🤖 Barcha mutaxassis agentlar (Hermes, Nova, Atlas, Cipher, Lyra, Kite) to‘liq tayyor holatda.` };
     }
     if (callbackData === 'menu_chat') {
       return { text: `💬 AI suhbat maydoni. Istalgan topshiriqni bering:` };
