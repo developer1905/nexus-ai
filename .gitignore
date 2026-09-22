@@ -1,0 +1,10 @@
+node_modules/
+.env
+.env.local
+*.log
+__pycache__/
+*.pyc
+.DS_Store
+nexus-ai-project.tar.gz
+*.zip
+*.tar.gz

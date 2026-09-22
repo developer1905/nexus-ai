@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  nexus-ai:
+    build: .
+    container_name: nexus-ai-saas
+    restart: always
+    ports:
+      - "80:8000"
+    environment:
+      - PORT=8000
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
+      - NAVY_API_KEY=${NAVY_API_KEY:-}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}

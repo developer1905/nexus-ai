@@ -1,0 +1,19 @@
+[Unit]
+Description=Nexus AI Agent SaaS Backend & Web Service
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/nexus-ai-agent-saas
+ExecStart=/usr/bin/python3 /home/ubuntu/nexus-ai-agent-saas/backend/server.py
+Restart=always
+RestartSec=3
+Environment=PORT=8000
+Environment=OPENROUTER_API_KEY=
+Environment=MISTRAL_API_KEY=
+Environment=NAVY_API_KEY=
+Environment=TELEGRAM_BOT_TOKEN=
+
+[Install]
+WantedBy=multi-user.target
