@@ -15,6 +15,31 @@ import hashlib
 import time
 import os
 
+def load_dotenv(filepath=".env"):
+    candidates = [
+        filepath,
+        os.path.join(os.path.dirname(__file__), "..", filepath),
+        os.path.join(os.path.dirname(__file__), filepath)
+    ]
+    for c in candidates:
+        if os.path.exists(c):
+            try:
+                with open(c, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line or line.startswith("#") or "=" not in line:
+                            continue
+                        k, v = line.split("=", 1)
+                        k = k.strip()
+                        v = v.strip().strip("'\"")
+                        if k not in os.environ:
+                            os.environ[k] = v
+                break
+            except Exception:
+                pass
+
+load_dotenv()
+
 PORT = int(os.environ.get("PORT", 8000))
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent"
 OPENROUTER_KEY = os.environ.get("OPENROUTER_API_KEY", "")
