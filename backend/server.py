@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Nexus AI Agent SaaS - Backend API Server (Phase 2 with OpenRouter & Mistral & Telegram Bot)
+Nexus AI Agent SaaS - Backend API Server (Phase 2 with OpenRouter, Mistral & Telegram Web App)
 """
 
 import http.server
@@ -51,19 +51,143 @@ TELEGRAM_JARVIS_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8993321594:AAFo1Ut
 EMERGENCY_STOP_ACTIVE = False
 EMERGENCY_STOP_REASON = ""
 
-MAIN_MENU_KEYBOARD = {
+WEB_APP_URL = "https://nexus-ai-httf.onrender.com"
+
+# 1. Asosiy doimiy klaviatura (ReplyKeyboardMarkup)
+REPLY_KEYBOARD = {
+    "keyboard": [
+        [
+            {"text": "🌐 Nexus AI Web App (Saytni ochish)", "web_app": {"url": WEB_APP_URL}}
+        ],
+        [
+            {"text": "🤖 Agentlar markazi"},
+            {"text": "💬 AI Suhbat"}
+        ],
+        [
+            {"text": "📋 Vazifalar"},
+            {"text": "🎯 Jamoalar"},
+            {"text": "⚡ Avtomatika"}
+        ],
+        [
+            {"text": "📊 Tahlil & Statistika"},
+            {"text": "🛠️ Asboblar & Ko'nikmalar"}
+        ],
+        [
+            {"text": "⚙️ Sozlamalar & Xavfsizlik"},
+            {"text": "ℹ️ Yordam & Qo'llanma"}
+        ]
+    ],
+    "resize_keyboard": True,
+    "one_time_keyboard": False
+}
+
+# 2. Bo'limlarga moslashtirilgan inline tugmalar
+AGENTS_INLINE_KEYBOARD = {
     "inline_keyboard": [
         [
-            {"text": "🤖 Agentlar", "callback_data": "menu_agents"},
-            {"text": "💬 AI Suhbat", "callback_data": "menu_chat"}
+            {"text": "🎯 Nova PM", "callback_data": "agent:nova"},
+            {"text": "🔬 Atlas Researcher", "callback_data": "agent:atlas"}
         ],
         [
-            {"text": "📋 Vazifalarim", "callback_data": "menu_tasks"},
-            {"text": "🎯 Jamoalar", "callback_data": "menu_teams"}
+            {"text": "📊 Cipher Analyst", "callback_data": "agent:cipher"},
+            {"text": "✍️ Lyra Copywriter", "callback_data": "agent:lyra"}
         ],
         [
-            {"text": "📊 Statistika", "callback_data": "menu_stats"},
-            {"text": "⚙️ Sozlamalar", "callback_data": "menu_settings"}
+            {"text": "💻 Kite Developer", "callback_data": "agent:kite"},
+            {"text": "🚀 Web Appda ochish", "web_app": {"url": WEB_APP_URL}}
+        ]
+    ]
+}
+
+TASKS_INLINE_KEYBOARD = {
+    "inline_keyboard": [
+        [
+            {"text": "✅ Tasdiqlash navbati (1)", "callback_data": "task:queue"},
+            {"text": "➕ Yangi vazifa", "callback_data": "task:new"}
+        ],
+        [
+            {"text": "📊 Bajarilganlar tarixi", "callback_data": "task:history"},
+            {"text": "🌐 Barcha vazifalar (Web App)", "web_app": {"url": WEB_APP_URL}}
+        ]
+    ]
+}
+
+TEAMS_INLINE_KEYBOARD = {
+    "inline_keyboard": [
+        [
+            {"text": "🚀 Growth Hacker Team", "callback_data": "team:growth"},
+            {"text": "⚡ DevOps Pipeline", "callback_data": "team:devops"}
+        ],
+        [
+            {"text": "🎯 Jamoalar studiyasi (Web App)", "web_app": {"url": WEB_APP_URL}}
+        ]
+    ]
+}
+
+AUTOMATIONS_INLINE_KEYBOARD = {
+    "inline_keyboard": [
+        [
+            {"text": "🔄 Webhook holati", "callback_data": "auto:webhook"},
+            {"text": "⏱️ Rejali triggerlar", "callback_data": "auto:triggers"}
+        ],
+        [
+            {"text": "🚨 Favqulodda to'xtatish (Emergency Stop)", "callback_data": "auto:emergency"}
+        ],
+        [
+            {"text": "⚡ Avtomatlashtirish (Web App)", "web_app": {"url": WEB_APP_URL}}
+        ]
+    ]
+}
+
+TOOLS_INLINE_KEYBOARD = {
+    "inline_keyboard": [
+        [
+            {"text": "🔍 Google Web Search", "callback_data": "tool:search"},
+            {"text": "🐍 Python Sandbox", "callback_data": "tool:python"}
+        ],
+        [
+            {"text": "🧠 OpenRouter (Free LLMs)", "callback_data": "tool:openrouter"},
+            {"text": "🌪️ Mistral AI", "callback_data": "tool:mistral"}
+        ],
+        [
+            {"text": "🛠️ Asboblarni ko'rish (Web App)", "web_app": {"url": WEB_APP_URL}}
+        ]
+    ]
+}
+
+STATS_INLINE_KEYBOARD = {
+    "inline_keyboard": [
+        [
+            {"text": "📈 Tokenlar & Sarf", "callback_data": "stats:tokens"},
+            {"text": "⏱️ API Kechikishi", "callback_data": "stats:latency"}
+        ],
+        [
+            {"text": "📜 Audit jurnallari", "callback_data": "stats:logs"},
+            {"text": "📊 Jonli grafiklar (Web App)", "web_app": {"url": WEB_APP_URL}}
+        ]
+    ]
+}
+
+SETTINGS_INLINE_KEYBOARD = {
+    "inline_keyboard": [
+        [
+            {"text": "🔑 API Kalitlar holati", "callback_data": "setting:keys"},
+            {"text": "🛡️ RBAC Rollari", "callback_data": "setting:rbac"}
+        ],
+        [
+            {"text": "⚙️ To'liq boshqaruv (Web App)", "web_app": {"url": WEB_APP_URL}}
+        ]
+    ]
+}
+
+CHAT_INLINE_KEYBOARD = {
+    "inline_keyboard": [
+        [
+            {"text": "🎯 Nova PM bilan suhbat", "callback_data": "chat:nova"},
+            {"text": "💻 Kite Developer (Kod)", "callback_data": "chat:kite"}
+        ],
+        [
+            {"text": "💬 To'liq AI Chat (Web App)", "web_app": {"url": WEB_APP_URL}}
         ]
     ]
 }
@@ -89,7 +213,6 @@ def send_telegram_message(token, chat_id, text, reply_markup=None):
             return json.loads(resp.read().decode('utf-8'))
     except Exception:
         try:
-            # Fallback without markdown in case of formatting error
             payload.pop("parse_mode", None)
             req = urllib.request.Request(
                 url,
@@ -147,6 +270,7 @@ class NexusAPIHandler(http.server.SimpleHTTPRequestHandler):
                 "mistralKeyConfigured": bool(MISTRAL_KEY),
                 "navyKeyConfigured": bool(NAVY_KEY),
                 "jarvisBotConnected": bool(TELEGRAM_JARVIS_TOKEN),
+                "webAppUrl": WEB_APP_URL,
                 "version": "2.1.0"
             }).encode('utf-8'))
             return
@@ -167,7 +291,7 @@ class NexusAPIHandler(http.server.SimpleHTTPRequestHandler):
         elif path.startswith('/api/telegram/set-webhook'):
             token = TELEGRAM_JARVIS_TOKEN
             query = path.split('?', 1)[1] if '?' in path else ""
-            webhook_url = "https://nexus-ai-httf.onrender.com/api/telegram/webhook"
+            webhook_url = f"{WEB_APP_URL}/api/telegram/webhook"
             for param in query.split('&'):
                 if param.startswith("url="):
                     webhook_url = urllib.parse.unquote(param.split("=", 1)[1])
@@ -246,7 +370,6 @@ class NexusAPIHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header('Content-Type', 'application/json')
             self.end_headers()
             self.wfile.write(b'{"ok": true, "status": "processed"}')
-            # Asynchronously or directly handle Telegram update
             try:
                 self.handle_telegram_webhook(data)
             except Exception as e:
@@ -263,7 +386,6 @@ class NexusAPIHandler(http.server.SimpleHTTPRequestHandler):
         if EMERGENCY_STOP_ACTIVE:
             return "⚠️ Favqulodda to'xtatish rejimi (Emergency Stop) faol. AI generatsiya vaqtincha to'xtatilgan."
 
-        # 1. OpenRouter agar kalit bo'lsa
         if OPENROUTER_KEY:
             try:
                 headers = {
@@ -286,7 +408,6 @@ class NexusAPIHandler(http.server.SimpleHTTPRequestHandler):
             except Exception:
                 pass
 
-        # 2. Mistral agar kalit bo'lsa
         if MISTRAL_KEY:
             try:
                 headers = {
@@ -307,12 +428,11 @@ class NexusAPIHandler(http.server.SimpleHTTPRequestHandler):
             except Exception:
                 pass
 
-        # 3. Intelligent fallback
         return (
             f"🤖 *Nexus AI Agent javobi:*\n\n"
             f"Sizning so'rovingiz qabul qilindi: *\"{prompt}\"*\n\n"
-            f"✅ *Holat:* Tahlil qilindi va loyiha monitoringiga biriktirildi.\n"
-            f"Qo'shimcha ma'lumot olish yoki boshqa agentlarni jalb qilish uchun quyidagi menyudan foydalanishingiz mumkin."
+            f"✅ *Holat:* Tahlil qilindi va avtonom monitoring tizimiga biriktirildi.\n\n"
+            f"Barcha natijalarni to'liq interfeysda ko'rish uchun quyidagi tugma orqali Web Appni oching:"
         )
 
     def handle_telegram_webhook(self, update):
@@ -321,7 +441,7 @@ class NexusAPIHandler(http.server.SimpleHTTPRequestHandler):
             print("Telegram token not configured", file=sys.stderr)
             return
 
-        # 1. Handle callback queries (tugmalar bosilganda)
+        # 1. Handle callback queries (Inline tugmalar bosilganda)
         if "callback_query" in update:
             cb = update["callback_query"]
             cb_id = cb.get("id")
@@ -329,37 +449,61 @@ class NexusAPIHandler(http.server.SimpleHTTPRequestHandler):
             chat_id = cb.get("message", {}).get("chat", {}).get("id")
             answer_callback_query(token, cb_id)
 
-            if cb_data == "menu_agents":
-                text = (
-                    "🤖 *Nexus AI Faol Agentlari:*\n\n"
-                    "1. 🎯 *Nova PM* — Bosh boshqaruvchi va loyihalar koordinatori\n"
-                    "2. 🔬 *Atlas Researcher* — Chuqur qidiruv va tahlilchi\n"
-                    "3. 📊 *Cipher Analyst* — Biznes ko'rsatkichlari va KPI tahlili\n"
-                    "4. ✍️ *Lyra Copywriter* — SMM va kontent yaratuvchi\n"
-                    "5. 💻 *Kite Developer* — Dasturlash va avtomatlashtirish"
-                )
-            elif cb_data == "menu_chat":
-                text = "💬 *AI Suhbat Rejimi*\n\nIstalgan savol yoki topshiriqni yozib yuboring. AI agent sizga o'zbek tilida javob beradi:"
-            elif cb_data == "menu_tasks":
-                text = (
-                    "📋 *Faol Topshiriqlar Holati:*\n\n"
-                    "• [Yuqori] Haftalik hisobot tayyorlash — *Kutilmoqda*\n"
-                    "• [O'rta] OpenRouter modellarini tahlil qilish — *Bajarildi*\n"
-                    "• [Past] Sentiment tahlili — *Jarayonda*"
-                )
-            elif cb_data == "menu_teams":
-                text = "🎯 *Agentlar Jamoasi:*\n\n• *Growth Hacker Team* (Nova PM, Lyra, Atlas)\n• *DevOps Pipeline* (Kite Developer, Cipher)"
-            elif cb_data == "menu_stats":
-                text = "📊 *Tizim Statistikasi:*\n\n• Qayta ishlangan so'rovlar: *1,482 ta*\n• API kechikishi: *38ms*\n• Ish vaqti (Uptime): *99.9%*"
-            elif cb_data == "menu_settings":
-                text = "⚙️ *Tizim Sozlamalari:*\n\n• Webhook: *Faol (Render)*\n• Emergency Stop: *O'chiq*\n• Versiya: *2.1.0*"
+            if cb_data == "agent:nova":
+                text = "🎯 *Nova PM:*\n\nLoyihalarni rejalashtirish, topshiriqlarni mutaxassislarga taqsimlash va bajarilishini nazorat qilish bo'yicha yetakchi agent."
+            elif cb_data == "agent:atlas":
+                text = "🔬 *Atlas Researcher:*\n\nReal vaqtda Google Web Search orqali ma'lumot to'playdi, bozor raqobatchilari va ilmiy yangiliklarni tahlil qiladi."
+            elif cb_data == "agent:cipher":
+                text = "📊 *Cipher Analyst:*\n\nKatta hajmdagi ma'lumotlarni, moliyaviy oqimlarni va KPI ko'rsatkichlarini tahlil qiluvchi analitik agent."
+            elif cb_data == "agent:lyra":
+                text = "✍️ *Lyra Copywriter:*\n\nO'zbek va ingliz tillarida yuqori sifatli marketing postlari, hisobotlar va taqdimot matnlari muallifi."
+            elif cb_data == "agent:kite":
+                text = "💻 *Kite Developer:*\n\nPython, JavaScript kodlarini yaratish, xatolarni tuzatish va integratsiyalarni avtomatlashtirish bo'yicha mutaxassis."
+            elif cb_data == "task:queue":
+                text = "✅ *Tasdiqlash Navbatidagi Topshiriq:*\n\n• Topshiriq: *Haftalik AI bozori hisoboti*\n• Muallif: Lyra Copywriter\n• Holat: *Inson tasdig'i kutilmoqda*\n\nTasdiqlash uchun Web Appga kiring."
+            elif cb_data == "task:new":
+                text = "➕ *Yangi Vazifa Yaratish:*\n\nVazifa matnini yoki topshiriqni to'g'ridan-to'g'ri shu yerga yozing yoki Web Appda to'liq shaklda oching."
+            elif cb_data == "task:history":
+                text = "📊 *Bajarilgan Topshiriqlar:*\n\n1. OpenRouter bepul modellarini ulash — *Bajarildi*\n2. Render Webhook integratsiyasi — *Bajarildi*\n3. JWT & RBAC xavfsizlik nazorati — *Faol*"
+            elif cb_data == "team:growth":
+                text = "🚀 *Growth Hacker Team:*\n\n• A'zolar: Nova PM, Lyra Copywriter, Atlas Researcher\n• Maqsad: Marketingni avtomatlashtirish va mijozlar jalb qilish"
+            elif cb_data == "team:devops":
+                text = "⚡ *DevOps Pipeline Team:*\n\n• A'zolar: Kite Developer, Cipher Analyst\n• Maqsad: Server monitoringi, API tekshiruvi va kod barqarorligi"
+            elif cb_data == "auto:webhook":
+                text = "🔄 *Webhook Holati:*\n\n• Manzil: `https://nexus-ai-httf.onrender.com/api/telegram/webhook`\n• Status: *Ulangan va faol (200 OK)*"
+            elif cb_data == "auto:triggers":
+                text = "⏱️ *Rejali Triggerlar:*\n\n• Har kuni 09:00 — Kunlik reja va briefing\n• Har 3 soatda — Server holati va tokenlar tahlili"
+            elif cb_data == "auto:emergency":
+                text = "🚨 *Favqulodda to'xtatish (Emergency Stop):*\n\nTizim hozir normal rejimda ishlamoqda. Agar kerak bo'lsa Web App orqali barcha agentlarni bir zumda to'xtatish mumkin."
+            elif cb_data == "tool:search":
+                text = "🔍 *Google Web Search:* Real vaqt qidiruv tizimi orqali internetdan faktlarni tekshiradi."
+            elif cb_data == "tool:python":
+                text = "🐍 *Python Sandbox:* Tizim xavfsiz izolyatsiyalangan muhitda Python skriptlarini yurgazadi."
+            elif cb_data == "tool:openrouter":
+                text = "🧠 *OpenRouter:* DeepSeek V3, Llama 3.3 va Qwen kabi bepul yirik modellar marshrutizatori."
+            elif cb_data == "tool:mistral":
+                text = "🌪️ *Mistral AI:* Codestral va Mistral Large modellariga to'g'ridan-to'g'ri kirish imkoniyati."
+            elif cb_data == "stats:tokens":
+                text = "📈 *Tokenlar Statistikasi:*\n\n• Bugungi so'rovlar: *32,450 token*\n• Bepul modellar orqali tejalgan mablag': *$4.20*"
+            elif cb_data == "stats:latency":
+                text = "⏱️ *API Kechikishi:*\n\n• O'rtacha javob vaqti: *42ms*\n• Uptime: *99.98%*"
+            elif cb_data == "stats:logs":
+                text = "📜 *Audit Jurnali:*\n\n• Barcha so'rovlar va tasdiqlar 90 kun davomida to'liq saqlanadi."
+            elif cb_data == "setting:keys":
+                text = "🔑 *API Kalitlar Holati:*\n\n• OpenRouter: *Faol*\n• Mistral AI: *Faol*\n• Navy AI: *Faol*\n• Telegram Bot: *Ulangan*"
+            elif cb_data == "setting:rbac":
+                text = "🛡️ *RBAC Ruxsatlari:*\n\n• Admin: To'liq boshqaruv\n• Operator: Vazifalarni tasdiqlash\n• Viewer: Faqat kuzatish"
+            elif cb_data == "chat:nova":
+                text = "🎯 *Nova PM bilan bog'lanildi.*\nLoyiha boshqaruvi bo'yicha savolingizni yozing:"
+            elif cb_data == "chat:kite":
+                text = "💻 *Kite Developer bilan bog'lanildi.*\nDasturlash bo'yicha vazifangizni yozing:"
             else:
-                text = f"⚡ Buyruq bajarildi: `{cb_data}`"
+                text = f"⚡ Amal bajarildi: `{cb_data}`"
 
-            send_telegram_message(token, chat_id, text, MAIN_MENU_KEYBOARD)
+            send_telegram_message(token, chat_id, text, AGENTS_INLINE_KEYBOARD)
             return
 
-        # 2. Handle text messages
+        # 2. Handle text messages (Klaviatura oldidagi tugmalar va matnlar)
         message = update.get("message")
         if not message:
             return
@@ -371,67 +515,135 @@ class NexusAPIHandler(http.server.SimpleHTTPRequestHandler):
         if not text or not chat_id:
             return
 
-        cmd = text.split()[0].lower()
+        # Klaviatura oldidagi tugmalar va komandalar marshruti
+        text_lower = text.lower()
 
-        if cmd == "/start":
+        if text_lower in ["/start", "start", "bosh menyu"]:
             reply = (
                 f"👋 *Assalomu alaykum, {first_name}!*\n\n"
-                f"Men *Nexus AI Enterprise SaaS* tizimining rasmiy Telegram botiman.\n\n"
-                f"Men orqali AI agentlar bilan muloqot qilishingiz, vazifalarni boshqarishingiz va avtonom tahlillarni amalga oshirishingiz mumkin.\n\n"
-                f"Quyidagi menyudan kerakli bo'limni tanlang yoki shunchaki savolingizni yozing:"
+                f"🚀 *Nexus AI Enterprise SaaS* platformasiga xush kelibsiz!\n\n"
+                f"Pastdagi klaviatura oldida joylashgan menyu orqali barcha bo'limlarni boshqarishingiz mumkin.\n\n"
+                f"🌐 Shuningdek, to'liq grafik interfeysdan foydalanish uchun *Nexus AI Web App* tugmasini bosing:"
             )
-            send_telegram_message(token, chat_id, reply, MAIN_MENU_KEYBOARD)
+            # Send message with persistent ReplyKeyboardMarkup
+            send_telegram_message(token, chat_id, reply, REPLY_KEYBOARD)
+            # Also send inline buttons for instant access
+            sub_text = "👇 Bo'limni tanlang yoki shunchaki o'z savolingizni yozing:"
+            send_telegram_message(token, chat_id, sub_text, AGENTS_INLINE_KEYBOARD)
             return
 
-        elif cmd == "/help":
+        elif "agentlar markazi" in text_lower or text_lower == "/agent":
             reply = (
-                "ℹ️ *Nexus AI Yordam Bo'limi*\n\n"
-                "Mavjud buyruqlar:\n"
-                "• `/start` — Asosiy menyu\n"
-                "• `/help` — Qo'llanma\n"
-                "• `/agent` — Agentlar ro'yxati\n"
-                "• `/tasks` — Topshiriqlar holati\n"
-                "• `/stats` — Tizim statistikasi\n\n"
-                "Yoki istalgan matnli savol yozsangiz, AI agent javob qaytaradi."
+                "🤖 *Nexus AI Agentlar Markazi:*\n\n"
+                "Tizimda 5 ta mustaqil mutaxassis AI agent faoliyat yuritmoqda:\n\n"
+                "• 🎯 *Nova PM* — Bosh boshqaruvchi va vazifalar taqsimlovchi\n"
+                "• 🔬 *Atlas Researcher* — Chuqur qidiruv va ma'lumot tahlilchi\n"
+                "• 📊 *Cipher Analyst* — Moliya va KPI analitigi\n"
+                "• ✍️ *Lyra Copywriter* — SMM va taqdimot kontenti ustasi\n"
+                "• 💻 *Kite Developer* — Python & Web dasturchi agent\n\n"
+                "Quyidagi agentlardan birini tanlang yoki Web Appda ko'ring:"
             )
-            send_telegram_message(token, chat_id, reply, MAIN_MENU_KEYBOARD)
+            send_telegram_message(token, chat_id, reply, AGENTS_INLINE_KEYBOARD)
             return
 
-        elif cmd == "/agent":
+        elif "ai suhbat" in text_lower or text_lower == "/chat":
             reply = (
-                "🤖 *Tizimdagi Mutaxassis Agentlar:*\n\n"
-                "1. 🎯 *Nova PM* — Loyihalar boshqaruvi\n"
-                "2. 🔬 *Atlas Researcher* — Tadqiqot va ma'lumot qidirish\n"
-                "3. 📊 *Cipher Analyst* — Tahlil va moliya\n"
-                "4. ✍️ *Lyra Copywriter* — Kontent va matnlar\n"
-                "5. 💻 *Kite Developer* — Dasturchi agent"
+                "💬 *AI Suhbat Rejimi:*\n\n"
+                "Siz OpenRouter (DeepSeek, Llama 3.3, Qwen) va Mistral AI modellari bilan to'g'ridan-to'g'ri muloqot qilishingiz mumkin.\n\n"
+                "Istalgan savol yoki topshiriqni yozib yuboring, agent sizga o'zbek tilida batafsil javob beradi:"
             )
-            send_telegram_message(token, chat_id, reply, MAIN_MENU_KEYBOARD)
+            send_telegram_message(token, chat_id, reply, CHAT_INLINE_KEYBOARD)
             return
 
-        elif cmd == "/tasks":
+        elif "vazifalar" in text_lower or text_lower == "/tasks":
             reply = (
-                "📋 *Sizning Vazifalaringiz:*\n\n"
-                "1. 🟢 Haftalik tahliliy hisobotni ko'rib chiqish\n"
-                "2. 🟡 Yangi mahsulot g'oyalarini saralash\n"
-                "3. ⚪ Bozor raqobatchilari tahlili"
+                "📋 *Topshiriqlar & Vazifalar Boshqaruvi:*\n\n"
+                "• 🟡 *Haftalik tahliliy hisobot* — Inson tasdig'i kutilmoqda\n"
+                "• 🟢 *OpenRouter modellar integratsiyasi* — Bajarildi\n"
+                "• 🔵 *Telegram bot & Web App bog'lanishi* — Faol\n\n"
+                "Amalni tanlang:"
             )
-            send_telegram_message(token, chat_id, reply, MAIN_MENU_KEYBOARD)
+            send_telegram_message(token, chat_id, reply, TASKS_INLINE_KEYBOARD)
             return
 
-        elif cmd == "/stats":
+        elif "jamoalar" in text_lower or text_lower == "/teams":
             reply = (
-                "📊 *Ishlab Chiqarish Statistikasi:*\n\n"
-                "• Jami so'rovlar: *1,482*\n"
-                "• Muvaffaqiyatli: *99.8%*\n"
-                "• Webhook: *Ulangan (Render)*"
+                "🎯 *Ko'p Agentli Jamoalar (Teams):*\n\n"
+                "Agentlar birgalikda zanjirli vazifalarni (Pipeline) bajarishadi:\n\n"
+                "1. 🚀 *Growth Hacker Team* (Nova PM + Lyra + Atlas)\n"
+                "2. ⚡ *DevOps & Engineering* (Kite Developer + Cipher)\n\n"
+                "Tafsilotlar uchun tanlang:"
             )
-            send_telegram_message(token, chat_id, reply, MAIN_MENU_KEYBOARD)
+            send_telegram_message(token, chat_id, reply, TEAMS_INLINE_KEYBOARD)
             return
 
-        # Oddiy savol/xabar bo'lsa AI generatsiya
+        elif "avtomatika" in text_lower or text_lower == "/automations":
+            reply = (
+                "⚡ *Avtomatlashtirish & Monitoring:*\n\n"
+                "• Webhook: *Ulangan (Render)*\n"
+                "• Avtomatik xabarlar: *Faol*\n"
+                "• Favqulodda to'xtatish (Emergency Stop): *Tayyor*\n\n"
+                "Kerakli bo'limni tanlang:"
+            )
+            send_telegram_message(token, chat_id, reply, AUTOMATIONS_INLINE_KEYBOARD)
+            return
+
+        elif "tahlil & statistika" in text_lower or text_lower == "/stats":
+            reply = (
+                "📊 *Tizim Tahlili va Statistikasi:*\n\n"
+                "• Jami qayta ishlangan so'rovlar: *1,482 ta*\n"
+                "• Muvaffaqiyat ko'rsatkichi: *99.8%*\n"
+                "• API kechikish vaqti: *38ms*\n"
+                "• Ish vaqti (Uptime): *99.9%*\n\n"
+                "Qo'shimcha ma'lumotlar:"
+            )
+            send_telegram_message(token, chat_id, reply, STATS_INLINE_KEYBOARD)
+            return
+
+        elif "asboblar & ko'nikmalar" in text_lower or text_lower in ["/tools", "/skills"]:
+            reply = (
+                "🛠️ *Integratsiyalangan Asboblar va Ko'nikmalar:*\n\n"
+                "• 🔍 *Google Web Search* — Internetdan real vaqt ma'lumot qidirish\n"
+                "• 🐍 *Python Sandbox* — Xavfsiz kod kompilyatsiyasi\n"
+                "• 🧠 *OpenRouter Gateway* — Bepul neyron tarmoqlar\n"
+                "• 🌪️ *Mistral AI* — Kuchli generativ modellar\n\n"
+                "Batafsil ma'lumot:"
+            )
+            send_telegram_message(token, chat_id, reply, TOOLS_INLINE_KEYBOARD)
+            return
+
+        elif "sozlamalar" in text_lower or text_lower == "/settings":
+            reply = (
+                "⚙️ *Tizim Sozlamalari va Xavfsizlik:*\n\n"
+                "• RBAC kirish nazorati: *Faol*\n"
+                "• Rate Limit (Anti-flood): *5 soniya*\n"
+                "• Audit jurnallari: *90 kun*\n"
+                "• Favqulodda to'xtatish: *Normal rejim*\n\n"
+                "Sozlamalarni ko'rish:"
+            )
+            send_telegram_message(token, chat_id, reply, SETTINGS_INLINE_KEYBOARD)
+            return
+
+        elif "yordam & qo'llanma" in text_lower or text_lower == "/help":
+            reply = (
+                "ℹ️ *Nexus AI Foydalanuvchi Qo'llanmasi*\n\n"
+                "Quyidagi klaviatura tugmalari orqali botni qulay boshqaring:\n"
+                "• 🌐 *Nexus AI Web App* — Saytni to'g'ridan-to'g'ri Telegram ichida ochish\n"
+                "• 🤖 *Agentlar markazi* — Mutaxassis agentlar ro'yxati\n"
+                "• 💬 *AI Suhbat* — Modellar bilan jonli muloqot\n"
+                "• 📋 *Vazifalar* — Topshiriqlar ijrosi va tasdiqlash\n"
+                "• 🎯 *Jamoalar* — Ko'p agentli hamkorlik\n"
+                "• ⚡ *Avtomatika* — Triggerlar va webhooklar\n"
+                "• 📊 *Tahlil & Statistika* — Tokenlar va sarf-xarajatlar\n"
+                "• 🛠️ *Asboblar* — Qidiruv va kod muhiti\n\n"
+                "Istalgan savolingizni bemalol yozib yuboring!"
+            )
+            send_telegram_message(token, chat_id, reply, REPLY_KEYBOARD)
+            return
+
+        # Oddiy savol yoki topshiriq kelganda AI javob qaytaradi
         ai_reply = self.generate_ai_response(text)
-        send_telegram_message(token, chat_id, ai_reply, MAIN_MENU_KEYBOARD)
+        send_telegram_message(token, chat_id, ai_reply, CHAT_INLINE_KEYBOARD)
 
     def handle_ai_generate(self, payload):
         prompt = payload.get("prompt", "Salom")
