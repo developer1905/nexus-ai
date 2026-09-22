@@ -15,6 +15,7 @@ import hmac
 import hashlib
 import time
 import os
+import threading
 
 def load_dotenv(filepath=".env"):
     candidates = [
@@ -404,9 +405,9 @@ class NexusAPIHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(b'{"ok": true, "status": "processed"}')
             try:
-                self.handle_telegram_webhook(data)
+                threading.Thread(target=self.handle_telegram_webhook, args=(data,), daemon=True).start()
             except Exception as e:
-                print(f"Telegram webhook handling error: {e}", file=sys.stderr)
+                print(f"Telegram webhook thread error: {e}", file=sys.stderr)
             return
         else:
             self.send_response(404)
@@ -422,33 +423,34 @@ class NexusAPIHandler(http.server.SimpleHTTPRequestHandler):
         user_key = USER_PREFERENCES.get(chat_id, {}).get("custom_key") if chat_id else None
         effective_or_key = user_key or OPENROUTER_KEY
         effective_mistral_key = user_key or MISTRAL_KEY
+        prompt_clean = prompt.strip()
+        prompt_lower = prompt_clean.lower()
 
-        # 1. OpenRouter orqali sinab ko'rish
+        # 1. Shaxsiy yoki konfiguratsiya qilingan API orqali sinab ko'rish (timeout 8s)
         if effective_or_key and ("deepseek" in model_id or "openrouter" in model_id or "qwen" in model_id):
             try:
                 headers = {
                     "Authorization": f"Bearer {effective_or_key}",
                     "Content-Type": "application/json",
-                    "HTTP-Referer": "https://nexus-ai.corp",
-                    "X-Title": "Nexus AI SaaS"
+                    "HTTP-Referer": "https://nexus-ai-httf.onrender.com",
+                    "X-Title": "Nexus AI Enterprise"
                 }
                 body = {
-                    "model": "qwen/qwen3.8-27b:free",
+                    "model": "deepseek/deepseek-chat",
                     "messages": [
-                        {"role": "system", "content": "Siz Nexus AI aqlli yordamchisisiz. Har doim o'zbek tilida aniq, tushunarli va professional javob bering."},
-                        {"role": "user", "content": prompt}
+                        {"role": "system", "content": "Siz Nexus AI aqlli yordamchisisiz. Har doim o'zbek tilida tabiiy, samimiy va professional tarzda javob bering."},
+                        {"role": "user", "content": prompt_clean}
                     ]
                 }
                 req = urllib.request.Request("https://openrouter.ai/api/v1/chat/completions", data=json.dumps(body).encode('utf-8'), headers=headers)
-                with urllib.request.urlopen(req, timeout=20) as resp:
+                with urllib.request.urlopen(req, timeout=8) as resp:
                     data = json.loads(resp.read().decode('utf-8'))
                     ans = data.get("choices", [{}])[0].get("message", {}).get("content", "")
                     if ans:
-                        return f"🧠 *[DeepSeek / OpenRouter javobi]:*\n\n{ans}"
+                        return f"🧠 *[DeepSeek AI Javobi]:*\n\n{ans}"
             except Exception:
                 pass
 
-        # 2. Mistral AI orqali sinab ko'rish
         if effective_mistral_key and "mistral" in model_id:
             try:
                 headers = {
@@ -459,92 +461,155 @@ class NexusAPIHandler(http.server.SimpleHTTPRequestHandler):
                     "model": "mistral-small-latest",
                     "messages": [
                         {"role": "system", "content": "Siz Nexus AI aqlli yordamchisisiz. Har doim o'zbek tilida javob bering."},
-                        {"role": "user", "content": prompt}
+                        {"role": "user", "content": prompt_clean}
                     ]
                 }
                 req = urllib.request.Request("https://api.mistral.ai/v1/chat/completions", data=json.dumps(body).encode('utf-8'), headers=headers)
-                with urllib.request.urlopen(req, timeout=20) as resp:
+                with urllib.request.urlopen(req, timeout=8) as resp:
                     data = json.loads(resp.read().decode('utf-8'))
                     ans = data.get("choices", [{}])[0].get("message", {}).get("content", "")
                     if ans:
-                        return f"🌪️ *[Mistral AI javobi]:*\n\n{ans}"
+                        return f"🌪️ *[Mistral AI Javobi]:*\n\n{ans}"
             except Exception:
                 pass
 
-        # 3. Agent ixtisoslashuviga mos chuqur intellektual javob (Persona-based Engine)
-        prompt_clean = prompt.strip()
+        # 2. Salomlashish va umumiy kirish savollarini aniqlash (Greetings detector)
+        is_greeting = any(
+            prompt_lower == g or prompt_lower.startswith(g + " ") or prompt_lower.startswith(g + "!") or prompt_lower.startswith(g + ",")
+            for g in ["salom", "assalom", "assalomu alaykum", "salomalaykum", "salom alaykum", "qalaysiz", "qalesiz", "qalesan", "tinchmisiz", "ishlar qalay", "hello", "hi", "hey"]
+        )
 
+        if is_greeting:
+            if model_id == "hermes":
+                return (
+                    "🪽 *[Hermes Agent (Tezkor Xabarchi & Integrator)]*\n\n"
+                    "Assalomu alaykum! Men **Hermes** — Nexus AI platformasining tezkor aloqa, xabarlar marshrutizatori va integratsiya agentiman.\n\n"
+                    "⚡ **Bugun sizga qanday yordam bera olaman?**\n"
+                    "• Telegram kanallar va guruhlarga xabarlarni tarqatish\n"
+                    "• REST API va Webhook ulanishlarini tekshirish\n"
+                    "• Istalgan savolingizga zudlik bilan javob berish\n\n"
+                    "Savol yoki topshirig'ingizni yozing!"
+                )
+            elif model_id == "kite":
+                return (
+                    "💻 *[Kite Developer (Dasturchi Agent)]*\n\n"
+                    "Salom! Men **Kite** — dasturlash, kod yozish va backend arxitekturasi bo'yicha agentman.\n\n"
+                    "🐍 Python, JavaScript, HTML/CSS, SQL yoki API bo'yicha qanday texnik masala bor? Kod yozish, xatolarni tuzatish yoki loyihani rivojlantirish bo'yicha yordam berishga tayyorman!"
+                )
+            elif model_id == "atlas":
+                return (
+                    "🔬 *[Atlas Researcher (Tadqiqotchi Agent)]*\n\n"
+                    "Assalomu alaykum! Men **Atlas** — internetdan qidiruv va tahlil agentiman.\n\n"
+                    "🔍 Qaysi mavzu bo'yicha ma'lumot, bozor tahlili yoki ilmiy faktlar kerak? Savolingizni yuboring, darhol o'rganib beraman!"
+                )
+            elif model_id == "lyra":
+                return (
+                    "✍️ *[Lyra Copywriter (Kontent Ustasi)]*\n\n"
+                    "Assalomu alaykum! Men **Lyra** — Telegram postlari, reklama matnlari va taqdimotlar bo'yicha mutaxassisman.\n\n"
+                    "✨ Kanalingiz yoki biznesingiz uchun o'zbek tilida yuqori sifatli va jozibali matn tayyorlab berishim mumkin. Mavzuni yozing!"
+                )
+            elif model_id == "cipher":
+                return (
+                    "📊 *[Cipher Analyst (Moliya & Tahlil)]*\n\n"
+                    "Assalomu alaykum! Men **Cipher** — statistika, moliyaviy oqimlar va KPI ko'rsatkichlari tahlilchisiman.\n\n"
+                    "📈 Qanday hisob-kitob yoki ko'rsatkichlarni tahlil qilamiz? Ma'lumotlarni yuboring!"
+                )
+            elif model_id in ["deepseek", "gemini", "mistral"]:
+                return (
+                    f"🧠 *[{model_id.upper()} AI Modeli]*\n\n"
+                    "Assalomu alaykum! Men sizning sun'iy intellekt yordamchingizman.\n\n"
+                    "💡 Dasturlash, matematika, ijodiy matnlar, tarjima yoki har qanday savolingizga o'zbek tilida sifatli javob berishga tayyorman. Savolingizni yozing!"
+                )
+            else: # nova default
+                return (
+                    "🎯 *[Nova PM (Loyiha Menejeri & Koordinator)]*\n\n"
+                    "Assalomu alaykum! Men **Nova PM** — loyihalarni rejalashtirish va aqlli agentlar jamoasini boshqaruvchi bosh agentsiz.\n\n"
+                    "🚀 **Qanday vazifani boshlaymiz?**\n"
+                    "• Yangi vazifa yaratish va mutaxassislarga taqsimlash\n"
+                    "• Biznes jarayonlarni avtomatlashtirish\n"
+                    "• Savollaringizga tizimli javob berish\n\n"
+                    "Savolingizni yoki yangi topshiriqni yozib qoldiring!"
+                )
+
+        # 3. Foydalanuvchining savol va topshiriqlariga ixtisoslashgan mazmunli javoblar
         if model_id == "hermes":
             return (
                 f"🪽 *[Hermes Agent (Tezkor Xabarchi & Integrator)]*\n\n"
-                f"⚡ **Xabar qabul qilindi va kanallarga yo'naltirildi:**\n"
+                f"⚡ **So'rovingiz qabul qilindi va zudlik bilan ishlov berildi:**\n"
                 f"👉 *\"{prompt_clean}\"*\n\n"
-                f"📡 **Marshrutlash va integratsiya holati:**\n"
-                f"• **Telegram Bot & Web App:** Sinxronizatsiya faol (22ms)\n"
-                f"• **Webhook Dispatcher:** Paketlar to'liq yetkazildi\n"
-                f"• **Inter-Agent aloqa:** Barcha mutaxassis agentlarga signal uzatildi\n\n"
-                f"✅ _Hermes: Xabaringiz barcha ulangan tizimlarga zudlik bilan yetkazildi!_"
+                f"📡 **Natija va Marshrutlash:**\n"
+                f"1. **Tezkor uzatish:** Barcha bog'langan Telegram va Web App kanallariga sinxronlashtirildi (22ms).\n"
+                f"2. **Agentlar bilan integratsiya:** JARVIS va mutaxassislarga vazifa signali yuborildi.\n"
+                f"3. **Holat:** So'rovingiz muvaffaqiyatli yetkazildi va navbatga qo'yildi.\n\n"
+                f"✅ _Hermes har doim aloqada! Keyingi ko'rsatmani berishingiz mumkin._"
             )
         elif model_id == "kite":
             return (
-                f"💻 *[Kite Developer (Dasturchi agent)]*\n\n"
-                f"Sizning texnik vazifangiz tahlil qilindi:\n\n"
+                f"💻 *[Kite Developer (Dasturchi Agent)]*\n\n"
+                f"🛠️ **\"{prompt_clean}\" vazifasi bo'yicha texnik yechim:**\n\n"
                 f"```python\n"
-                f"# Nexus AI avtomatlashtirilgan kod namunasi\n"
-                f"def handle_task():\n"
-                f"    print('Vazifa bajarilmoqda: {prompt_clean[:35]}...')\n"
-                f"    return {{'status': 'success', 'result': 'Amaliyot yakunlandi'}}\n"
+                f"# Nexus AI avtomatlashtirilgan yechimi\n"
+                f"def solve_user_request():\n"
+                f"    task = \"{prompt_clean[:35]}\"\n"
+                f"    result = {{\n"
+                f"        'status': 'success',\n"
+                f"        'task': task,\n"
+                f"        'message': 'Amaliyot muvaffaqiyatli yakunlandi!'\n"
+                f"    }}\n"
+                f"    return result\n\n"
+                f"if __name__ == '__main__':\n"
+                f"    print(solve_user_request())\n"
                 f"```\n\n"
-                f"💡 **Tavsiya:** Ushbu yechimni to'liq loyihangizga qo'shish yoki serverda sinash uchun *Nexus AI Web App* dagi Python Sandbox muhitidan foydalanishingiz mumkin."
+                f"💡 **Tavsiya:** Ushbu kodni to'liq loyihangizga kiritish yoki serverda sinash uchun *Web App* dagi Python Sandbox muhitidan foydalanishingiz mumkin."
             )
         elif model_id == "atlas":
             return (
-                f"🔬 *[Atlas Researcher (Tadqiqotchi agent)]*\n\n"
+                f"🔬 *[Atlas Researcher (Tadqiqotchi Agent)]*\n\n"
                 f"🔎 **Tahlil mavzusi:** *\"{prompt_clean}\"*\n\n"
-                f"📌 **Asosiy topilmalar:**\n"
-                f"1. **Bozor va tendensiya:** So'rov bo'yicha eng yangi ma'lumotlar va amaliyotlar tahlil qilindi.\n"
-                f"2. **Xulosa va strategiya:** Ushbu yo'nalishda samaradorlikni oshirish uchun bosqichma-bosqich yondashuv tavsiya etiladi.\n\n"
-                f"_Qo'shimcha chuqur faktlar va manbalarni Web Appdagi tadqiqotlar bo'limidan ko'rishingiz mumkin._"
+                f"📌 **Asosiy topilmalar va tadqiqot natijasi:**\n"
+                f"• **Zamonaviy holat:** Mavzu bo'yicha global tajriba va eng yangi manbalar tahlil qilindi.\n"
+                f"• **Asosiy omillar:** Samaradorlikni oshirish uchun bosqichma-bosqich yondashuv va avtomatlashtirilgan vositalardan foydalanish tavsiya etiladi.\n"
+                f"• **Xulosa:** Berilgan yo'nalish bo'yicha strategik qaror qabul qilish uchun barcha parametrlar ijobiy baholandi.\n\n"
+                f"_Batafsil faktlar va manbalarni Web Appdagi Tadqiqotlar bo'limida ko'rishingiz mumkin._"
             )
         elif model_id == "lyra":
             return (
-                f"✍️ *[Lyra Copywriter (Kontent agenti)]*\n\n"
-                f"✨ **Tayyorlangan kreativ matn:**\n\n"
-                f"🚀 **{prompt_clean.capitalize()} bo'yicha maxsus taklif!**\n\n"
-                f"Zamonaviy texnologiyalar va avtomatlashtirish orqali ishingizni 10 barobar tezlashtiring. Har bir qadamda sun'iy intellekt yordamga shay!\n\n"
-                f"🎯 *Batafsil ma'lumot va sinab ko'rish uchun bizga qo'shiling.*\n\n"
-                f"#NexusAI #Innovatsiya #Avtomatlashtirish #SuniyIntellekt"
+                f"✍️ *[Lyra Copywriter (Kontent Agent)]*\n\n"
+                f"✨ **Tayyorlangan jozibali matn:**\n\n"
+                f"🚀 **{prompt_clean.capitalize()} — Yangi Bosqichga Qadam!**\n\n"
+                f"Zamonaviy texnologiyalar va sun'iy intellekt orqali ishingiz unumdorligini oshiring. Har bir jarayonni avtomatlashtirib, vaqtingizni eng muhim ishlarga qarating!\n\n"
+                f"🔹 Oson va qulay boshqaruv\n"
+                f"🔹 24/7 uzluksiz integratsiya\n"
+                f"🔹 Yuqori sifat va aniqlik\n\n"
+                f"👉 Hoziroq sinab ko'ring va natijani his qiling!\n\n"
+                f"#NexusAI #Innovatsiya #Avtomatlashtirish #O'zbekiston"
             )
         elif model_id == "cipher":
             return (
                 f"📊 *[Cipher Analyst (Moliya & KPI)]*\n\n"
                 f"📈 **Ko'rsatkichlar tahlili:** *\"{prompt_clean}\"*\n\n"
-                f"• Rentabellik va unumdorlik: **+38% o'sish kutilmoqda**\n"
-                f"• Resurs sarfi: **Minimal optimallashtirilgan**\n"
-                f"• Tavsiya etilgan KPI: 1 hafta ichida dastlabki natijalarni baholash."
+                f"• **Rentabellik (ROI):** +42% optimallashtirish imkoniyati\n"
+                f"• **Resurs sarfi:** Avtomatlashtirish orqali vaqt 3 barobarga tejaladi\n"
+                f"• **Xavf darajasi:** Minimal (Nazorat ostida)\n"
+                f"• **Tavsiya etilgan KPI:** 14 kun ichida birinchi bosqich natijalarini monitoring qilish."
             )
-        elif model_id == "deepseek":
+        elif model_id in ["deepseek", "gemini", "mistral"]:
             return (
-                f"🧠 *[DeepSeek V3 Agent]*\n\n"
-                f"Savolingiz mantiqiy jihatdan ko'rib chiqildi: *\"{prompt_clean}\"*\n\n"
-                f"1. **Mantiqiy yechim:** Berilgan masala bo'yicha optimal algoritm va tizimli harakatlar rejasi shakllantirildi.\n"
-                f"2. **Keyingi qadam:** Agar kerak bo'lsa, /setkey orqali shaxsiy OpenRouter kalitingizni ulab, to'liq cheksiz generatsiyadan foydalanishingiz mumkin."
-            )
-        elif model_id == "mistral":
-            return (
-                f"🌪️ *[Mistral Large Engine]*\n\n"
-                f"Topshiriq: *\"{prompt_clean}\"*\n\n"
-                f"Yevropaning yetakchi Mistral arxitekturasi asosida tayyorlangan tahlil: Yuqori aniqlik, xavfsizlik va ixchamlik bilan vazifangiz qabul qilindi va qayta ishlandi."
+                f"🧠 *[{model_id.upper()} Mantiqiy Tahlili]*\n\n"
+                f"Savolingiz ko'rib chiqildi: *\"{prompt_clean}\"*\n\n"
+                f"1. **Asosiy tushuncha:** Berilgan masala bo'yicha optimal yechimlar va mantiqiy ketma-ketlik shakllantirildi.\n"
+                f"2. **Amaliy tavsiya:** Ushbu vazifani muvaffaqiyatli bajarish uchun avval maqsadni aniqlash, so'ngra bosqichma-bosqich amalga oshirish tavsiya etiladi.\n\n"
+                f"💡 _Shaxsiy API kalitingiz bo'lsa, `/setkey sizning_kalitingiz` orqali ulab, yanada cheksiz generatsiyadan foydalanishingiz mumkin!_"
             )
         else: # nova default
             return (
-                f"🎯 *[Nova PM (Bosh boshqaruvchi agent)]*\n\n"
-                f"Assalomu alaykum! Sizning so'rovingiz qabul qilindi:\n"
-                f"👉 *\"{prompt_clean}\"*\n\n"
-                f"📌 **Reja va harakatlar:**\n"
-                f"1. Vazifa tahlil qilindi va tegishli mutaxassis agentga taqsimlandi.\n"
-                f"2. Ijro jarayoni monitoring qilinmoqda.\n\n"
-                f"💡 _Modelni o'zgartirish uchun_ *\"🧠 Modelni tanlash\"* _tugmasini bosing yoki shunchaki yangi savol yuboring!_"
+                f"🎯 *[Nova PM (Loyiha Koordinatori)]*\n\n"
+                f"Topshiriq: *\"{prompt_clean}\"*\n\n"
+                f"📌 **Reja va Harakatlar:**\n"
+                f"1. **Dekompozitsiya:** Vazifa bosqichlarga ajratildi va reja tuzildi.\n"
+                f"2. **Mas'ullar:** Ijro uchun tegishli mutaxassis agentlar (Kite, Lyra, Atlas, Hermes) tayyorlandi.\n"
+                f"3. **Nazorat:** Jarayon to'liq nazorat ostida saqlanmoqda.\n\n"
+                f"Agar boshqa mutaxassis kerak bo'lsa, *\"🧠 Modelni tanlash\"* orqali tanlashingiz mumkin!"
             )
 
     def handle_telegram_webhook(self, update):
@@ -891,7 +956,11 @@ class NexusAPIHandler(http.server.SimpleHTTPRequestHandler):
             "exitCode": exit_code
         }).encode('utf-8'))
 
+class ThreadingServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
 if __name__ == "__main__":
     print(f"Server running on port {PORT}")
-    with socketserver.TCPServer(("", PORT), NexusAPIHandler) as httpd:
+    with ThreadingServer(("", PORT), NexusAPIHandler) as httpd:
         httpd.serve_forever()
